@@ -1,0 +1,196 @@
+{
+  "info": {
+    "_postman_id": "jnt-rekap-collection",
+    "name": "JNT Rekap - Rekapan Outgoing Barang API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Rekapan",
+      "item": [
+        {
+          "name": "Create Rekapan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tanggal\": \"2024-01-15\",\n  \"waybill\": \"WB-000001-ABCDE\",\n  \"provinsi\": \"DKI Jakarta\",\n  \"jenisBarang\": \"Electronics\",\n  \"jumlahKoli\": 5,\n  \"beratKg\": 12.5,\n  \"ongkir\": 50000,\n  \"asuransi\": 10000,\n  \"packing\": 5000,\n  \"metodePembayaran\": \"TRANSFER\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/rekapan",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "rekapan"]
+            }
+          }
+        },
+        {
+          "name": "Get All Rekapan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/rekapan?page=1&limit=10",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "rekapan"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Rekapan by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/rekapan/{{rekapan_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "rekapan", "{{rekapan_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Rekapan",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ongkir\": 55000,\n  \"asuransi\": 12000\n}"
+            },
+            "url": {
+              "raw": "http://localhost:3000/api/rekapan/{{rekapan_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "rekapan", "{{rekapan_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Rekapan",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/rekapan/{{rekapan_id}}",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "rekapan", "{{rekapan_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/rekapan/summary?startDate=2024-01-01&endDate=2024-01-31",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "rekapan", "summary"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2024-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2024-01-31"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Rekapan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/rekapan?search=Jakarta&startDate=2024-01-01&endDate=2024-01-31&page=1&limit=20",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "rekapan"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "Jakarta"
+                },
+                {
+                  "key": "startDate",
+                  "value": "2024-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2024-01-31"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:3000/health",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["health"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "rekapan_id",
+      "value": "replace-with-actual-uuid"
+    }
+  ]
+}

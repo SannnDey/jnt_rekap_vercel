@@ -1,0 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model RekapanOutgoing {
+  id                  String   @id @default(uuid()) @db.Char(36)
+  
+  tanggalRekap        DateTime @default(now())
+  tanggal             DateTime
+  waybill             String   @db.VarChar(100)
+  provinsi            String   @db.VarChar(100)
+  jenisBarang         String   @db.VarChar(150)
+  
+  jumlahKoli          Int
+  beratKg             Float
+  
+  ongkir              Int
+  asuransi            Int
+  packing             Int
+  total               Int
+  
+  metodePembayaran    MetodePembayaran
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([tanggal])
+  @@index([waybill])
+  @@index([metodePembayaran])
+  @@map("rekapan_outgoing")
+}
+
+enum MetodePembayaran {
+  TRANSFER
+  CASH
+  TF_CASH
+  PICKUP_ONLINE
+  BULANAN
+  
+  @@map("metode_pembayaran")
+}

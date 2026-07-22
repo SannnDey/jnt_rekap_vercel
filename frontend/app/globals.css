@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    min-height: 100vh;
+    background-image: radial-gradient(circle at top, rgba(14,165,233,0.12), transparent 28%), radial-gradient(circle at bottom right, rgba(59,130,246,0.08), transparent 20%);
+  }
+
+  * {
+    @apply box-border;
+  }
+
+  ::selection {
+    @apply bg-sky-200 text-slate-900;
+  }
+}
