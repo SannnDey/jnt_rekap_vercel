@@ -38,12 +38,76 @@ model RekapanOutgoing {
   @@map("rekapan_outgoing")
 }
 
+model RekapanInternal {
+  id                    String   @id @default(uuid()) @db.Char(36)
+  tanggalRekap          DateTime @default(now())
+  waybill               String   @db.VarChar(100)
+  sprinterDelivery      String   @db.VarChar(150)
+  jumlahKoli            Int
+  jumlahPembayaranCOD   Int
+  biayaDFOD             Int
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([tanggalRekap])
+  @@index([createdAt])
+  @@index([waybill])
+  @@map("rekapan_internal")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid()) @db.Char(36)
+  type      String   @db.VarChar(100)
+  details   String?  @db.Text
+  user      String?  @db.VarChar(100)
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([createdAt])
+  @@map("activity_log")
+}
+
 enum MetodePembayaran {
   TRANSFER
   CASH
   TF_CASH
   PICKUP_ONLINE
   BULANAN
+  DFOD
   
   @@map("metode_pembayaran")
+}
+
+model Kasbon {
+  id          String   @id @default(uuid()) @db.Char(36)
+  employee    String   @db.VarChar(150)
+  tanggal     DateTime
+  amount      Int
+  description String?  @db.Text
+  settled     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([employee])
+  @@index([tanggal])
+  @@map("kasbon")
+}
+
+model Pengeluaran {
+  id               String   @id @default(uuid()) @db.Char(36)
+  tanggal          DateTime
+  jenis            String   @db.VarChar(255)
+  nominal          Int
+  metodePembayaran MetodePembayaran
+  kategori         String   @db.VarChar(100) // e.g., 'Pengeluaran Harian' or 'Pengeluaran Outgoing'
+  tipeKendaraan    String?  @db.VarChar(150)
+  jenisBahanBakar  String?  @db.VarChar(150)
+  liter            Float?
+  km               Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tanggal])
+  @@index([kategori])
+  @@map("pengeluaran")
 }

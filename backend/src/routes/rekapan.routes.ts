@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import {
   createRekapanOutgoing,
+  importRekapan,
   getAllRekapanOutgoing,
+  compareRekapanResults,
   getRekapanOutgoingById,
   updateRekapanOutgoing,
   deleteRekapanOutgoing,
@@ -20,8 +22,14 @@ router.get('/summary', getRekapanSummary);
 // POST /api/rekapan - Create new rekapan
 router.post('/', createRekapanOutgoing);
 
+// POST /api/rekapan/import - Bulk import rekapan rows (validated server-side)
+router.post('/import', importRekapan);
+
 // GET /api/rekapan - Get all rekapan with pagination
 router.get('/', getAllRekapanOutgoing);
+
+// GET /api/rekapan/compare - Debug endpoint to compare paginated vs all results
+router.get('/compare', compareRekapanResults);
 
 // GET /api/rekapan/:id - Get by ID
 router.get('/:id', getRekapanOutgoingById);

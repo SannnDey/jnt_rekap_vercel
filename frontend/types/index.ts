@@ -4,7 +4,12 @@ export enum MetodePembayaran {
   TF_CASH = 'TF_CASH',
   PICKUP_ONLINE = 'PICKUP_ONLINE',
   BULANAN = 'BULANAN',
+  DFOD = 'DFOD',
 }
+
+export const MetodePembayaranValues = Object.values(MetodePembayaran) as MetodePembayaran[];
+export const isValidMetodePembayaran = (value: string): value is MetodePembayaran =>
+  MetodePembayaranValues.includes(value as MetodePembayaran);
 
 export interface RekapanOutgoing {
   id: string;
@@ -76,5 +81,74 @@ export interface SummaryData {
     method: MetodePembayaran;
     count: number;
     total: number;
+    totalOngkir?: number;
+    totalAsuransi?: number;
+    totalPacking?: number;
   }>;
+  // DFOD / non-DFOD breakdowns
+  totalOngkirDFOD?: number;
+  totalAsuransiDFOD?: number;
+  totalPackingDFOD?: number;
+  totalAmountDFOD?: number;
+  totalOngkirNonDFOD?: number;
+  totalAsuransiNonDFOD?: number;
+  totalPackingNonDFOD?: number;
+  totalAmountNonDFOD?: number;
+}
+
+export interface KasbonRecord {
+  id: string;
+  employee: string;
+  tanggal: string;
+  amount: number;
+  description?: string | null;
+  settled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KasbonSummaryByEmployee {
+  employee: string;
+  count: number;
+  totalAmount: number;
+}
+
+export interface KasbonSummary {
+  totalCount: number;
+  totalAmount: number;
+  byEmployee: KasbonSummaryByEmployee[];
+}
+
+export interface PengeluaranRecord {
+  id: string;
+  tanggal: string;
+  jenis: string;
+  nominal: number;
+  metodePembayaran: MetodePembayaran;
+  kategori: string;
+  tipeKendaraan?: string;
+  jenisBahanBakar?: string;
+  liter?: number;
+  km?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PengeluaranSummaryByKategori {
+  kategori: string;
+  count: number;
+  total: number;
+}
+
+export interface PengeluaranSummaryByMetode {
+  metode: MetodePembayaran;
+  count: number;
+  total: number;
+}
+
+export interface PengeluaranSummary {
+  totalCount: number;
+  totalNominal: number;
+  byKategori: PengeluaranSummaryByKategori[];
+  byMetode: PengeluaranSummaryByMetode[];
 }

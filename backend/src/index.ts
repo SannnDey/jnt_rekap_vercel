@@ -3,6 +3,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { errorHandler, notFoundHandler, logError } from './middleware/errorHandler';
 import rekapanRoutes from './routes/rekapan.routes';
+import rekapanInternalRoutes from './routes/rekapanInternal.routes';
+import kasbonRoutes from './routes/kasbon.routes';
+import pengeluaranRoutes from './routes/pengeluaran.routes';
 
 dotenv.config();
 
@@ -63,6 +66,9 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/rekapan', rekapanRoutes);
+app.use('/api/rekapan-internal', rekapanInternalRoutes);
+app.use('/api/kasbon', kasbonRoutes);
+app.use('/api/pengeluaran', pengeluaranRoutes);
 
 // ========== Error Handlers ==========
 

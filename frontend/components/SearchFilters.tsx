@@ -9,6 +9,14 @@ interface SearchFiltersProps {
   onStartDateChange: (date: string) => void;
   endDate: string;
   onEndDateChange: (date: string) => void;
+  provinsi: string;
+  onProvinsiChange: (value: string) => void;
+  metodePembayaran: string;
+  onMetodeChange: (value: string) => void;
+  sortBy: string;
+  onSortByChange: (value: string) => void;
+  sortOrder: 'asc' | 'desc' | '';
+  onSortOrderChange: (value: 'asc' | 'desc' | '') => void;
 }
 
 export default function SearchFilters({
@@ -18,6 +26,14 @@ export default function SearchFilters({
   onStartDateChange,
   endDate,
   onEndDateChange,
+  provinsi,
+  onProvinsiChange,
+  metodePembayaran,
+  onMetodeChange,
+  sortBy,
+  onSortByChange,
+  sortOrder,
+  onSortOrderChange,
 }: SearchFiltersProps) {
   return (
     <div className="space-y-6">
@@ -56,6 +72,59 @@ export default function SearchFilters({
                 className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
+          </div>
+        </div>
+        <div className="grid w-full gap-4 sm:grid-cols-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Provinsi</label>
+            <input
+              type="text"
+              value={provinsi}
+              onChange={(e) => onProvinsiChange(e.target.value)}
+              placeholder="Semua provinsi"
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Metode Pembayaran</label>
+            <select
+              value={metodePembayaran}
+              onChange={(e) => onMetodeChange(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Semua metode</option>
+              <option value="TRANSFER">Transfer</option>
+              <option value="CASH">Cash</option>
+              <option value="TF_CASH">TF Cash</option>
+              <option value="PICKUP_ONLINE">Pickup Online</option>
+              <option value="BULANAN">Bulan</option>
+              <option value="DFOD">DFOD</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Urutkan berdasarkan</label>
+            <select
+              value={sortBy}
+              onChange={(e) => onSortByChange(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Default</option>
+              <option value="tanggal">Tanggal</option>
+              <option value="total">Total</option>
+              <option value="provinsi">Provinsi</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Arah Sort</label>
+            <select
+              value={sortOrder}
+              onChange={(e) => onSortOrderChange(e.target.value as 'asc' | 'desc' | '')}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Default</option>
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
           </div>
         </div>
       </div>

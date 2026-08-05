@@ -20,11 +20,16 @@ export const useRekapanList = (
   search?: string,
   startDate?: string,
   endDate?: string,
+  provinsi?: string,
+  metodePembayaran?: string,
+  sortBy?: string,
+  sortOrder?: 'asc' | 'desc',
   refreshKey?: number
 ) => {
   return useQuery<ApiResponse<RekapanOutgoing[]>, Error>({
-    queryKey: [REKAPAN_QUERY_KEY, page, limit, search, startDate, endDate, refreshKey],
-    queryFn: () => apiClient.getRekapanList(page, limit, search, startDate, endDate),
+    queryKey: [REKAPAN_QUERY_KEY, page, limit, search, startDate, endDate, provinsi, metodePembayaran, sortBy, sortOrder, refreshKey],
+    queryFn: () =>
+      apiClient.getRekapanList(page, limit, search, startDate, endDate, provinsi, metodePembayaran, sortBy, sortOrder),
     placeholderData: (previousData?: ApiResponse<RekapanOutgoing[]>) => previousData,
   });
 };

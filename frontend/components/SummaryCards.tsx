@@ -123,6 +123,53 @@ export default function SummaryCards({ startDate, endDate }: SummaryCardsProps) 
           </div>
         ))}
       </div>
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-medium opacity-90">Non-DFOD (Diluar DFOD)</p>
+          <div className="mt-3 text-slate-700">
+            <div className="flex items-center justify-between"><span className="text-sm">Total Ongkir</span><span className="font-semibold">{formatCurrency(summary.totalOngkirNonDFOD ?? 0)}</span></div>
+            <div className="flex items-center justify-between mt-2"><span className="text-sm">Total Asuransi</span><span className="font-semibold">{formatCurrency(summary.totalAsuransiNonDFOD ?? 0)}</span></div>
+            <div className="flex items-center justify-between mt-2"><span className="text-sm">Total Packing</span><span className="font-semibold">{formatCurrency(summary.totalPackingNonDFOD ?? 0)}</span></div>
+            <div className="flex items-center justify-between mt-3 border-t pt-3"><span className="text-sm">Total Keseluruhan</span><span className="text-xl font-semibold">{formatCurrency(summary.totalAmountNonDFOD ?? 0)}</span></div>
+          </div>
+        </div>
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-medium opacity-90">DFOD</p>
+          <div className="mt-3 text-slate-700">
+            <div className="flex items-center justify-between"><span className="text-sm">Total Ongkir</span><span className="font-semibold">{formatCurrency(summary.totalOngkirDFOD ?? 0)}</span></div>
+            <div className="flex items-center justify-between mt-2"><span className="text-sm">Total Asuransi</span><span className="font-semibold">{formatCurrency(summary.totalAsuransiDFOD ?? 0)}</span></div>
+            <div className="flex items-center justify-between mt-2"><span className="text-sm">Total Packing</span><span className="font-semibold">{formatCurrency(summary.totalPackingDFOD ?? 0)}</span></div>
+            <div className="flex items-center justify-between mt-3 border-t pt-3"><span className="text-sm">Total Keseluruhan</span><span className="text-xl font-semibold">{formatCurrency(summary.totalAmountDFOD ?? 0)}</span></div>
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <h4 className="text-lg font-semibold text-slate-900 mb-3">Ringkasan Per Metode Pembayaran</h4>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-100">
+              <tr>
+                <th className="px-4 py-2 text-left font-semibold text-slate-700">Metode</th>
+                <th className="px-4 py-2 text-right font-semibold text-slate-700">Total Ongkir</th>
+                <th className="px-4 py-2 text-right font-semibold text-slate-700">Total Asuransi</th>
+                <th className="px-4 py-2 text-right font-semibold text-slate-700">Total Packing</th>
+                <th className="px-4 py-2 text-right font-semibold text-slate-700">Total Keseluruhan</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white">
+              {(summary.byMethod || []).map((m) => (
+                <tr key={String(m.method)} className="hover:bg-slate-50">
+                  <td className="px-4 py-2 text-slate-700">{m.method}</td>
+                  <td className="px-4 py-2 text-right text-slate-700">{formatCurrency(m.totalOngkir || 0)}</td>
+                  <td className="px-4 py-2 text-right text-slate-700">{formatCurrency(m.totalAsuransi || 0)}</td>
+                  <td className="px-4 py-2 text-right text-slate-700">{formatCurrency(m.totalPacking || 0)}</td>
+                  <td className="px-4 py-2 text-right font-semibold text-slate-900">{formatCurrency(m.total || 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

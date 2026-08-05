@@ -25,15 +25,16 @@ export const formatNumber = (value: number): string => {
   return new Intl.NumberFormat('id-ID').format(value);
 };
 
-export const formatWeight = (kg: number): string => {
-  if (kg >= 1000) {
-    const tons = kg / 1000;
-    return `${new Intl.NumberFormat('id-ID', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(tons)} ton`;
-  }
+export const parseFormattedNumber = (value: string): string => {
+  if (!value) return '';
+  const normalized = String(value).replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+  const parsed = Number(normalized);
+  if (Number.isNaN(parsed)) return '';
+  return parsed.toFixed(0);
+};
 
+export const formatWeight = (kg: number): string => {
+  // Always display weight in kilograms to match imported Excel data units
   return `${new Intl.NumberFormat('id-ID', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
@@ -79,4 +80,21 @@ export const getFriendlyErrorMessage = (error: unknown): string => {
   }
 
   return 'Terjadi kesalahan tidak terduga. Silakan coba lagi.';
+};
+
+export const computeExportMonthLabel = (month: string): string => {
+  // month: YYYY-MM
+  try {
+    return dayjs(month + '-01').format('MMMM YYYY');
+  } catch (e) {
+    return month;
+  }
+};
+
+export const getMonthRange = (month: string): { startDate: string; endDate: string } | null => {
+  // month: YYYY-MM -> return start and end in YYYY-MM-DD
+  if (!/^[0-9]{4}-[0-9]{2}$/.test(month)) return null;
+  const start = dayjs(month + '-01').startOf('month');
+  const end = dayjs(month + '-01').endOf('month');
+  return { startDate: start.format('YYYY-MM-DD'), endDate: end.format('YYYY-MM-DD') };
 };

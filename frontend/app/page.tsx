@@ -1,881 +1,118 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import Header from '@/components/Header';
-import ExcelJS from 'exceljs';
-import { apiClient } from '@/lib/api';
-import { getFriendlyErrorMessage, formatCurrency } from '@/lib/utils';
-import { useToast } from '@/components/ToastProvider';
-import RekapanTable from '@/components/RekapanTable';
-import RekapanForm from '@/components/RekapanForm';
-import SearchFilters from '@/components/SearchFilters';
-import SummaryCards from '@/components/SummaryCards';
-import { CreateRekapanInput, RekapanOutgoing } from '@/types';
+
+const modules = [
+   {
+    title: 'Rekapan Internal Harian',
+    description: 'Kelola data internal harian dengan form dan tabel ringkas.',
+    href: '/rekapan-internal-harian',
+    accent: 'from-amber-500 to-orange-500',
+  },
+  {
+    title: 'Rekapan Outgoing',
+    description: 'Kelola data pengiriman keluar dan lihat ringkasan operasional.',
+    href: '/rekapan-outgoing',
+    accent: 'from-sky-500 to-cyan-500',
+  },
+  {
+    title: 'Rekapan Pengeluaran Harian',
+    description: 'Catat pengeluaran harian dan lihat ringkasannya.',
+    href: '/rekapan-pengeluaran-harian-outgoing',
+    accent: 'from-emerald-500 to-lime-500',
+  },
+  {
+    title: 'Rekapan Kasbon',
+    description: 'Pantau kasbon per karyawan dan riwayat transaksi.',
+    href: '/rekapan-kasbon',
+    accent: 'from-violet-500 to-fuchsia-500',
+  },
+];
 
 export default function HomePage() {
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [exportLoading, setExportLoading] = useState(false);
-  const [exportPreviewLoading, setExportPreviewLoading] = useState(false);
-  const [exportPreviewRows, setExportPreviewRows] = useState<RekapanOutgoing[]>([]);
-  const [exportPreviewOpen, setExportPreviewOpen] = useState(false);
-  const [exportSelectedMonth, setExportSelectedMonth] = useState('');
-  const [exportPeriodLabel, setExportPeriodLabel] = useState('');
-  const [importLoading, setImportLoading] = useState(false);
-  const [importPreviewRows, setImportPreviewRows] = useState<CreateRekapanInput[]>([]);
-  const [importPreviewOpen, setImportPreviewOpen] = useState(false);
-  const [importFileName, setImportFileName] = useState('');
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { toast } = useToast();
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  const resetPage = () => setCurrentPage(1);
-  const handleSearchChange = (term: string) => {
-    resetPage();
-    setSearchTerm(term);
-  };
-  const handleStartDateChange = (date: string) => {
-    resetPage();
-    setStartDate(date);
-  };
-  const handleEndDateChange = (date: string) => {
-    resetPage();
-    setEndDate(date);
-  };
-
-  const handleFormClose = () => {
-    setShowForm(false);
-    setEditingId(null);
-  };
-
-  const handleEdit = (id: string) => {
-    setEditingId(id);
-    setShowForm(true);
-  };
-
-  const handleRefreshData = () => {
-    setCurrentPage(1);
-    setRefreshKey((value) => value + 1);
-  };
-
-  const computeExportMonthLabel = (month: string) => {
-    if (!month) return 'Semua waktu';
-    const [year, monthValue] = month.split('-');
-    const parsed = new Date(Number(year), Number(monthValue) - 1, 1);
-    return parsed.toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
-  };
-
-  const getMonthRange = (month: string) => {
-    if (!month) return null;
-    const [year, monthValue] = month.split('-');
-    const yearNum = Number(year);
-    const monthNum = Number(monthValue);
-    if (!yearNum || !monthNum) return null;
-    const startDate = `${year}-${monthValue}-01`;
-    const lastDay = new Date(yearNum, monthNum, 0).getDate();
-    const endDate = `${year}-${monthValue}-${String(lastDay).padStart(2, '0')}`;
-    return { startDate, endDate };
-  };
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      document.body.style.overflow = showForm ? 'hidden' : '';
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        document.body.style.overflow = '';
-      }
-    };
-  }, [showForm]);
-
   return (
-    <main className="min-h-screen bg-slate-50">
-      <Header />
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <Header
+        title="Dashboard Utama"
+        subtitle="Sistem Rekap J&T Cargo BDG015A"
+        description="Pusat kontrol untuk mengelola semua rekap J&T Cargo."
+        right={
+          <div className="space-y-2 text-sm leading-6 text-slate-200">
+            <p className="font-semibold uppercase tracking-[0.3em] text-sky-300">Navigasi Cepat</p>
+            <p>Semua modul penting berada dalam satu halaman yang rapi.</p>
+          </div>
+        }
+      />
 
-      <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.18),_transparent_35%)]" />
-        <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-          <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-8 shadow-2xl shadow-slate-200/40 backdrop-blur-sm">
-            <div className="grid gap-8 xl:grid-cols-[1.6fr_0.9fr] xl:items-center">
-              <div className="max-w-2xl">
-                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-600">Dashboard</p>
-                <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">Rekapan Outgoing Barang</h1>
-                <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">Kelola pengiriman dengan tampilan rapi, filter cepat, dan statistik real-time untuk keputusan operasional yang lebih baik.</p>
+      <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
+        <section className="rounded-[2.5rem] border border-white/10 bg-slate-900/90 p-8 shadow-[0_30px_90px_rgba(15,23,42,0.35)] backdrop-blur-xl">
+          <div className="grid gap-10 lg:grid-cols-[1.4fr_0.9fr] lg:items-start">
+            <div className="space-y-6">
+              <div className="inline-flex rounded-full bg-sky-500/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.28em] text-sky-200 shadow-sm shadow-sky-500/10">
+                Selamat Datang
               </div>
-
+              <div className="space-y-4">
+                <h2 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+                  Kelola semua rekap dengan akurat dan tepat.
+                </h2>
+                <p className="max-w-2xl text-base leading-8 text-slate-300">
+                  Akses cepat ke pengeluaran, kasbon, outgoing, dan internal harian.
+                </p>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6 shadow-sm">
-                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Tingkat Efisiensi</p>
-                  <p className="mt-4 text-3xl font-semibold text-slate-900">98.7%</p>
-                  <p className="mt-2 text-sm text-slate-600">Capaian performa pengiriman bulan ini.</p>
+                <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
+                  <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Modul Tersedia</p>
+                  <p className="mt-3 text-3xl font-semibold text-white">{modules.length}</p>
+                  <p className="mt-2 text-sm text-slate-400">Satu klik untuk masuk ke setiap area kerja penting.</p>
                 </div>
-                <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6 shadow-sm">
-                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Status Jaringan</p>
-                  <p className="mt-4 text-3xl font-semibold text-slate-900">Stabil</p>
-                  <p className="mt-2 text-sm text-slate-600">Semua koneksi API dan database aktif.</p>
+                <div className="rounded-[2rem] border border-white/10 bg-slate-950/80 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
+                  <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Keunggulan</p>
+                  <p className="mt-3 text-3xl font-semibold text-white">Antarmuka Premium</p>
+                  <p className="mt-2 text-sm text-slate-400">Desain modern, kontras tajam, dan navigasi yang lebih nyaman.</p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => setShowForm(true)}
-                className="inline-flex items-center justify-center rounded-full bg-sky-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-600/20 transition hover:bg-sky-700"
-              >
-                + Tambah Rekapan
-              </button>
-              <button
-                onClick={() => {
-                  setExportSelectedMonth(startDate ? startDate.slice(0, 7) : '');
-                  setExportPreviewRows([]);
-                  setExportPeriodLabel('');
-                  setExportPreviewOpen(true);
-                }}
-                className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-              >
-                Export
-              </button>
-              <input
-                ref={(el) => { fileInputRef.current = el; }}
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setImportLoading(true);
-                  try {
-                    const buffer = await file.arrayBuffer();
-                    const workbook = new ExcelJS.Workbook();
-                    await workbook.xlsx.load(buffer);
-                    const sheet = workbook.worksheets[0];
-                    if (!sheet) throw new Error('File Excel tidak memiliki sheet.');
-
-                    // map headers -> column numbers
-                    const headerMap: Record<string, number> = {};
-                    let headerRowIndex = 1;
-                    const maxScan = Math.min(10, sheet.rowCount || 10);
-                    const headerCandidates: Array<{ index: number; matches: number }> = [];
-
-                    for (let r = 1; r <= maxScan; r++) {
-                      const row = sheet.getRow(r);
-                      let matches = 0;
-                      row.eachCell((cell) => {
-                        const text = (cell.value || '').toString().trim().toLowerCase();
-                        if (
-                          text.includes('tanggal') ||
-                          text.includes('waybill') ||
-                          text.includes('provinsi') ||
-                          text.includes('jenis') ||
-                          text.includes('koli') ||
-                          text.includes('jumlah') ||
-                          text.includes('berat') ||
-                          text.includes('ongkir') ||
-                          text.includes('asuransi') ||
-                          text.includes('packing') ||
-                          text.includes('metode')
-                        ) {
-                          matches++;
-                        }
-                      });
-                      headerCandidates.push({ index: r, matches });
-                    }
-
-                    headerCandidates.sort((a, b) => b.matches - a.matches);
-                    if (headerCandidates[0]?.matches >= 2) {
-                      headerRowIndex = headerCandidates[0].index;
-                    }
-
-                    const headerRow = sheet.getRow(headerRowIndex);
-                    headerRow.eachCell((cell, colNumber) => {
-                      const text = (cell.value || '').toString().trim().toLowerCase();
-                      headerMap[text] = colNumber;
-                    });
-
-                    const mapHeaderToKey = (h: string) => {
-                      const s = h.trim().toLowerCase();
-                      if (s.includes('tanggal')) return 'tanggal';
-                      if (s.includes('waybill')) return 'waybill';
-                      if (s.includes('provinsi')) return 'provinsi';
-                      if (s.includes('jenis')) return 'jenisBarang';
-                      if (s.includes('koli') || s.includes('jumlah')) return 'jumlahKoli';
-                      if (s.includes('berat')) return 'beratKg';
-                      if (s.includes('ongkir')) return 'ongkir';
-                      if (s.includes('asuransi')) return 'asuransi';
-                      if (s.includes('packing')) return 'packing';
-                      if (s.includes('metode')) return 'metodePembayaran';
-                      return '';
-                    };
-
-                    // build a reverse map of expected keys -> column index
-                    const colForKey: Record<string, number | undefined> = {};
-                    Object.keys(headerMap).forEach((h) => {
-                      const key = mapHeaderToKey(h);
-                      if (key) colForKey[key] = headerMap[h];
-                    });
-
-                    const rows = [] as CreateRekapanInput[];
-                    for (let i = headerRowIndex + 1; i <= sheet.rowCount; i++) {
-                      const row = sheet.getRow(i);
-                      // stop if row empty (no waybill)
-                      const waybillCell = colForKey['waybill'] ? row.getCell(colForKey['waybill'] as number).value : null;
-                      if (!waybillCell || String(waybillCell).trim() === '') continue;
-
-                      const formatCellValue = (val: any) => {
-                        if (val === undefined || val === null) return null;
-                        if (typeof val === 'string') return val.trim();
-                        if (typeof val === 'number') {
-                          if (Number.isInteger(val)) {
-                            return val.toFixed(0);
-                          }
-                          return val.toString();
-                        }
-                        if (val instanceof Date) return val;
-                        return String(val).trim();
-                      };
-
-                      const getCellValue = (key: string) => {
-                        const col = colForKey[key];
-                        if (!col) return null;
-                        const val = row.getCell(col).value;
-                        return formatCellValue(val);
-                      };
-
-                      const parseExcelDate = (raw: any): Date | null => {
-                        if (!raw && raw !== 0) return null;
-                        if (raw instanceof Date) return raw;
-                        if (typeof raw === 'number') {
-                          const jsTime = (raw - 25569) * 86400 * 1000;
-                          return new Date(jsTime);
-                        }
-                        if (typeof raw === 'string') {
-                          const txt = raw.replace(/,/g, ' ').replace(/\./g, ':').trim();
-                          const parts = txt.split(/\s+/);
-                          const datePart = parts[0] || '';
-                          const timePart = parts[1] || '00:00:00';
-                          const [day, month, year] = datePart.split('/').map((s) => parseInt(s, 10));
-                          const [hh, mm, ss] = timePart.split(':').map((s) => parseInt(s, 10) || 0);
-                          if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-                            const normalizedYear = year < 100 ? 2000 + year : year;
-                            return new Date(normalizedYear, (month || 1) - 1, day || 1, hh || 0, mm || 0, ss || 0);
-                          }
-                        }
-                        return null;
-                      };
-
-                      // parse date
-                      const rawTanggal = getCellValue('tanggal');
-                      const tanggal = parseExcelDate(rawTanggal);
-
-                      const parseNumber = (v: any) => {
-                        if (v == null || v === '') return 0;
-                        if (typeof v === 'number') return v;
-                        const s = String(v).replace(/[^0-9,.-]/g, '').replace(/,/g, '');
-                        const n = parseFloat(s);
-                        return isNaN(n) ? 0 : n;
-                      };
-
-                      const metodeRaw = getCellValue('metodePembayaran');
-                      const metodeStr = metodeRaw ? String(metodeRaw).toUpperCase().replace(/\s+/g, '_') : 'TRANSFER';
-                      const methodMap: Record<string, any> = {
-                        TRANSFER: 'TRANSFER',
-                        CASH: 'CASH',
-                        TF_CASH: 'TF_CASH',
-                        TF: 'TF_CASH',
-                        PICKUP_ONLINE: 'PICKUP_ONLINE',
-                        PICKUP: 'PICKUP_ONLINE',
-                        BULANAN: 'BULANAN',
-                      };
-
-                      rows.push({
-                        tanggal: tanggal || new Date(),
-                        waybill: String(getCellValue('waybill') || '').trim(),
-                        provinsi: String(getCellValue('provinsi') || '').trim(),
-                        jenisBarang: String(getCellValue('jenisBarang') || '').trim(),
-                        jumlahKoli: parseInt(String(getCellValue('jumlahKoli') || '0'), 10) || 0,
-                        beratKg: parseNumber(getCellValue('beratKg')) || 0,
-                        ongkir: parseNumber(getCellValue('ongkir')) || 0,
-                        asuransi: parseNumber(getCellValue('asuransi')) || 0,
-                        packing: parseNumber(getCellValue('packing')) || 0,
-                        metodePembayaran: methodMap[metodeStr] || 'TRANSFER',
-                      });
-                    }
-
-                    if (rows.length === 0) {
-                      toast('Tidak ada baris data yang terdeteksi untuk diimpor.', 'error');
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                      return;
-                    }
-
-                    setImportPreviewRows(rows);
-                    setImportFileName(file.name);
-                    setImportPreviewOpen(true);
-                  } catch (err) {
-                    toast(getFriendlyErrorMessage(err), 'error');
-                  } finally {
-                    setImportLoading(false);
-                  }
-                }}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importLoading}
-                className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-              >
-                {importLoading ? 'Memuat...' : 'Import Excel'}
-              </button>
-            </div>
-          </section>
-
-          {importPreviewOpen && (
-            <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center bg-slate-950/80 px-4 py-8 backdrop-blur-sm">
-              <div className="w-full max-w-5xl overflow-hidden rounded-[1.75rem] bg-white shadow-2xl ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 bg-slate-50 px-6 py-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h3 className="text-xl font-semibold text-slate-900">Preview Import Excel</h3>
-                      <p className="mt-1 text-sm text-slate-500">File: {importFileName} · {importPreviewRows.length} baris siap diimpor.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImportPreviewOpen(false);
-                        setImportPreviewRows([]);
-                        if (fileInputRef.current) fileInputRef.current.value = '';
-                      }}
-                      className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                    >
-                      Tutup
-                    </button>
-                  </div>
-                </div>
-                <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-                  <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 sm:grid-cols-4">
-                    <div className="rounded-3xl bg-slate-50 p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Baris</p>
-                      <p className="mt-2 text-2xl font-semibold text-slate-900">{importPreviewRows.length}</p>
-                    </div>
-                    <div className="rounded-3xl bg-slate-50 p-4 shadow-sm sm:col-span-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">File</p>
-                      <p className="mt-2 text-lg font-semibold text-slate-900 truncate">{importFileName}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                      <thead className="bg-slate-100">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700">No</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700">Tanggal</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700">Waybill</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700">Provinsi</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700">Jenis Barang</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700">Koli</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700">Berat</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700">Ongkir</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700">Metode</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 bg-white">
-                        {importPreviewRows.slice(0, 8).map((row, index) => (
-                          <tr key={index} className="hover:bg-slate-50">
-                            <td className="whitespace-nowrap px-4 py-3 text-slate-600">{index + 1}</td>
-                            <td className="px-4 py-3 text-slate-700">{row.tanggal.toLocaleDateString('id-ID')} {row.tanggal.toLocaleTimeString('id-ID')}</td>
-                            <td className="px-4 py-3 text-slate-700">{row.waybill}</td>
-                            <td className="px-4 py-3 text-slate-700">{row.provinsi}</td>
-                            <td className="px-4 py-3 text-slate-700">{row.jenisBarang}</td>
-                            <td className="px-4 py-3 text-slate-700">{row.jumlahKoli}</td>
-                            <td className="px-4 py-3 text-slate-700">{row.beratKg}</td>
-                            <td className="px-4 py-3 text-slate-700">{row.ongkir}</td>
-                            <td className="px-4 py-3 text-slate-700">{row.metodePembayaran}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {importPreviewRows.length > 8 && (
-                      <div className="p-4 text-sm text-slate-500">Menampilkan 8 dari {importPreviewRows.length} baris.</div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImportPreviewOpen(false);
-                      setImportPreviewRows([]);
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }}
-                    className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            <div className="rounded-[2rem] border border-white/10 bg-slate-950/80 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">Sorotan Modul</p>
+              <div className="mt-6 space-y-4">
+                {modules.map((module) => (
+                  <Link
+                    key={module.href}
+                    href={module.href}
+                    className="group flex items-start gap-4 rounded-[1.75rem] border border-white/5 bg-white/5 px-5 py-5 transition hover:border-sky-300/40 hover:bg-slate-900/90"
                   >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setImportPreviewOpen(false);
-                      setImportLoading(true);
-                      try {
-                        let success = 0;
-                        const errors: string[] = [];
-                        for (let i = 0; i < importPreviewRows.length; i++) {
-                          const row = importPreviewRows[i];
-                          try {
-                            await apiClient.createRekapan(row);
-                            success++;
-                          } catch (err) {
-                            errors.push(`Baris ${i + 2}: ${getFriendlyErrorMessage(err)}`);
-                          }
-                        }
-                        if (success > 0) {
-                          toast(`${success} baris berhasil diimpor.`, 'success');
-                          handleRefreshData();
-                        }
-                        if (errors.length > 0) {
-                          toast(`Beberapa baris gagal: ${errors.slice(0, 3).join(' | ')}`, 'error');
-                        }
-                      } finally {
-                        setImportLoading(false);
-                        setImportPreviewRows([]);
-                        if (fileInputRef.current) fileInputRef.current.value = '';
-                      }
-                    }}
-                    disabled={importLoading}
-                    className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
-                  >
-                    {importLoading ? 'Mengimpor...' : 'Konfirmasi Import'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {exportPreviewOpen && (
-            <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center bg-slate-950/80 px-4 py-8 backdrop-blur-sm">
-              <div className="w-full max-w-5xl overflow-hidden rounded-[1.75rem] bg-white shadow-2xl ring-1 ring-slate-200">
-                <div className="border-b border-slate-200 bg-slate-50 px-6 py-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h3 className="text-xl font-semibold text-slate-900">Export Rekapan</h3>
-                      <p className="mt-1 text-sm text-slate-500">Pilih bulan yang ingin diekspor, lalu tampilkan preview sebelum mengunduh.</p>
+                    <div className={`mt-1 h-12 w-12 rounded-3xl bg-gradient-to-br ${module.accent} p-3 shadow-lg shadow-slate-950/20`} />
+                    <div className="grow">
+                      <h3 className="text-lg font-semibold text-white">{module.title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-400">{module.description}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExportPreviewOpen(false);
-                        setExportPreviewRows([]);
-                        setExportSelectedMonth('');
-                        setExportPeriodLabel('');
-                      }}
-                      className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                    >
-                      Tutup
-                    </button>
-                  </div>
-                </div>
-                <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
-                  <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
-                      <p className="text-sm font-semibold text-slate-700">Pilih Bulan Ekspor</p>
-                      <p className="mt-2 text-sm text-slate-500">Gunakan bulan yang ingin ditarik dari data rekapan.</p>
-                      <input
-                        type="month"
-                        value={exportSelectedMonth}
-                        onChange={(e) => setExportSelectedMonth(e.target.value)}
-                        className="mt-4 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                      />
-                      <p className="mt-3 text-sm text-slate-600">
-                        Bulan terpilih: <span className="font-semibold text-slate-900">{exportSelectedMonth ? computeExportMonthLabel(exportSelectedMonth) : 'Belum dipilih'}</span>
-                      </p>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!exportSelectedMonth) {
-                            toast('Pilih bulan export terlebih dahulu.', 'error');
-                            return;
-                          }
-                          const range = getMonthRange(exportSelectedMonth);
-                          if (!range) {
-                            toast('Periode bulan tidak valid.', 'error');
-                            return;
-                          }
-
-                          setExportPreviewLoading(true);
-                          try {
-                            const resp = await apiClient.getRekapanList(1, 10000, undefined, range.startDate, range.endDate);
-                            const items = (resp.data as RekapanOutgoing[]) || [];
-                            if (items.length === 0) {
-                              toast('Tidak ada data untuk bulan tersebut.', 'error');
-                              setExportPreviewRows([]);
-                              setExportPeriodLabel('');
-                              return;
-                            }
-                            setExportPreviewRows(items);
-                            setExportPeriodLabel(computeExportMonthLabel(exportSelectedMonth));
-                          } catch (err) {
-                            toast(getFriendlyErrorMessage(err), 'error');
-                          } finally {
-                            setExportPreviewLoading(false);
-                          }
-                        }}
-                        className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
-                      >
-                        {exportPreviewLoading ? 'Memuat preview...' : 'Tampilkan Preview'}
-                      </button>
-                    </div>
-
-                    <div className="rounded-3xl bg-slate-50 p-5 shadow-sm">
-                      <p className="text-sm font-semibold text-slate-700">Ringkasan</p>
-                      <div className="mt-4 space-y-3 text-sm text-slate-600">
-                        <div className="rounded-3xl bg-white p-4 shadow-sm">
-                          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Periode Ekspor</p>
-                          <p className="mt-2 font-semibold text-slate-900">{exportPeriodLabel || (exportSelectedMonth ? computeExportMonthLabel(exportSelectedMonth) : 'Belum dipilih')}</p>
-                        </div>
-                        <div className="rounded-3xl bg-white p-4 shadow-sm">
-                          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Baris</p>
-                          <p className="mt-2 font-semibold text-slate-900">{exportPreviewRows.length}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {exportPreviewRows.length > 0 && (
-                    <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200">
-                      <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-100">
-                          <tr>
-                            <th className="px-4 py-3 text-left font-semibold text-slate-700">No</th>
-                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Tanggal</th>
-                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Waybill</th>
-                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Provinsi</th>
-                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Jenis Barang</th>
-                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Koli</th>
-                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Berat</th>
-                            <th className="px-4 py-3 text-right font-semibold text-slate-700">Ongkir</th>
-                            <th className="px-4 py-3 text-right font-semibold text-slate-700">Asuransi</th>
-                            <th className="px-4 py-3 text-right font-semibold text-slate-700">Packing</th>
-                            <th className="px-4 py-3 text-right font-semibold text-slate-700">Total</th>
-                            <th className="px-4 py-3 text-left font-semibold text-slate-700">Metode</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 bg-white">
-                          {exportPreviewRows.slice(0, 8).map((row, index) => (
-                            <tr key={row.id} className="hover:bg-slate-50">
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">{index + 1}</td>
-                              <td className="px-4 py-3 text-slate-700">{new Date(row.tanggal).toLocaleDateString('id-ID')} {new Date(row.tanggal).toLocaleTimeString('id-ID')}</td>
-                              <td className="px-4 py-3 text-slate-700">{row.waybill}</td>
-                              <td className="px-4 py-3 text-slate-700">{row.provinsi}</td>
-                              <td className="px-4 py-3 text-slate-700">{row.jenisBarang}</td>
-                              <td className="px-4 py-3 text-slate-700">{row.jumlahKoli}</td>
-                              <td className="px-4 py-3 text-slate-700">{row.beratKg}</td>
-                              <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.ongkir)}</td>
-                              <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.asuransi)}</td>
-                              <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.packing)}</td>
-                              <td className="px-4 py-3 text-right font-semibold text-slate-700">{formatCurrency(row.total)}</td>
-                              <td className="px-4 py-3 text-slate-700">{row.metodePembayaran}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {exportPreviewRows.length > 8 && (
-                        <div className="p-4 text-sm text-slate-500">Menampilkan 8 dari {exportPreviewRows.length} baris.</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExportPreviewOpen(false);
-                      setExportPreviewRows([]);
-                      setExportSelectedMonth('');
-                      setExportPeriodLabel('');
-                    }}
-                    className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (exportPreviewRows.length === 0) {
-                        toast('Tampilkan preview terlebih dahulu sebelum download.');
-                        return;
-                      }
-                      setExportLoading(true);
-                      try {
-                        const workbook = new ExcelJS.Workbook();
-                        const worksheet = workbook.addWorksheet('Rekapan');
-
-                        // Set column widths
-                        worksheet.columns = [
-                          { header: 'Tanggal', key: 'tanggal', width: 18 },
-                          { header: 'Waybill', key: 'waybill', width: 18 },
-                          { header: 'Provinsi', key: 'provinsi', width: 16 },
-                          { header: 'Jenis Barang', key: 'jenisBarang', width: 18 },
-                          { header: 'Jumlah Koli', key: 'jumlahKoli', width: 14 },
-                          { header: 'Berat (kg)', key: 'beratKg', width: 14 },
-                          { header: 'Ongkir', key: 'ongkir', width: 14 },
-                          { header: 'Asuransi', key: 'asuransi', width: 14 },
-                          { header: 'Packing', key: 'packing', width: 14 },
-                          { header: 'Total', key: 'total', width: 16 },
-                          { header: 'Metode Pembayaran', key: 'metodePembayaran', width: 18 },
-                        ];
-
-                        // Add title row
-                        const titleRow = worksheet.addRow(['REKAPAN PENGIRIMAN OUTGOING']);
-                        titleRow.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
-                        titleRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCC0000' } };
-                        titleRow.alignment = { horizontal: 'center', vertical: 'middle' };
-                        worksheet.mergeCells('A1:K1');
-                        titleRow.height = 28;
-
-                        // Add period info row
-                        const periodRow = worksheet.addRow([`Periode Rekap: ${exportPeriodLabel}`]);
-                        periodRow.font = { bold: true, size: 11, color: { argb: 'FF000000' } };
-                        periodRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-                        periodRow.alignment = { horizontal: 'left', vertical: 'middle' };
-                        worksheet.mergeCells('A2:K2');
-                        periodRow.height = 20;
-
-                        // Add empty row
-                        worksheet.addRow([]);
-
-                        // Set up columns header (row 4)
-                        const headerRow = worksheet.addRow([
-                          'Tanggal', 'Waybill', 'Provinsi', 'Jenis Barang', 'Jumlah Koli',
-                          'Berat (kg)', 'Ongkir', 'Asuransi', 'Packing', 'Total', 'Metode Pembayaran'
-                        ]);
-                        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-                        headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0066CC' } };
-                        headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-                        headerRow.height = 24;
-
-                        // Initialize totals
-                        let totalKoli = 0;
-                        let totalBerat = 0;
-                        let totalOngkir = 0;
-                        let totalAsuransi = 0;
-                        let totalPacking = 0;
-                        let totalKeseluruhan = 0;
-
-                        exportPreviewRows.forEach((item, idx) => {
-                          const tanggalValue = item.tanggal ? new Date(item.tanggal) : null;
-                          const rowData = [
-                            tanggalValue instanceof Date && !isNaN(tanggalValue.getTime()) ? tanggalValue : item.tanggal,
-                            item.waybill,
-                            item.provinsi,
-                            item.jenisBarang,
-                            item.jumlahKoli,
-                            item.beratKg,
-                            item.ongkir,
-                            item.asuransi,
-                            item.packing,
-                            item.total,
-                            item.metodePembayaran,
-                          ];
-                          const row = worksheet.addRow(rowData);
-                          row.font = { size: 10 };
-                          row.alignment = { horizontal: 'left', vertical: 'middle' };
-
-                          // Alternate row colors
-                          if (idx % 2 === 0) {
-                            row.eachCell((cell) => {
-                              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-                            });
-                          }
-
-                          // Format number columns
-                          row.getCell(5).alignment = { horizontal: 'center' };
-                          row.getCell(6).alignment = { horizontal: 'right' };
-                          row.getCell(7).alignment = { horizontal: 'right' };
-                          (row.getCell(7) as any).numFmt = '#,##0';
-                          row.getCell(8).alignment = { horizontal: 'right' };
-                          (row.getCell(8) as any).numFmt = '#,##0';
-                          row.getCell(9).alignment = { horizontal: 'right' };
-                          (row.getCell(9) as any).numFmt = '#,##0';
-                          row.getCell(10).alignment = { horizontal: 'right' };
-                          (row.getCell(10) as any).numFmt = '#,##0';
-
-                          // Calculate totals
-                          totalKoli += item.jumlahKoli;
-                          totalBerat += item.beratKg;
-                          totalOngkir += item.ongkir;
-                          totalAsuransi += item.asuransi;
-                          totalPacking += item.packing;
-                          totalKeseluruhan += item.total;
-                        });
-
-                        // Add empty row before totals
-                        worksheet.addRow([]);
-
-                        // Add totals header row
-                        const totalHeaderRow = worksheet.addRow([]);
-                        totalHeaderRow.getCell(1).value = 'TOTAL';
-                        totalHeaderRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-                        totalHeaderRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF006600' } };
-                        totalHeaderRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-
-                        const totalRow = worksheet.addRow([
-                          '',
-                          `Total Waybill: ${exportPreviewRows.length}`,
-                          '',
-                          '',
-                          totalKoli,
-                          totalBerat.toFixed(2),
-                          totalOngkir,
-                          totalAsuransi,
-                          totalPacking,
-                          totalKeseluruhan,
-                          '',
-                        ]);
-
-                        totalRow.font = { bold: true, size: 11 };
-                        totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFEB3B' } };
-                        totalRow.alignment = { horizontal: 'center', vertical: 'middle' };
-
-                        // Format total row cells
-                        totalRow.getCell(5).alignment = { horizontal: 'center' };
-                        (totalRow.getCell(5) as any).numFmt = '0';
-                        totalRow.getCell(6).alignment = { horizontal: 'right' };
-                        (totalRow.getCell(6) as any).numFmt = '0.00';
-                        totalRow.getCell(7).alignment = { horizontal: 'right' };
-                        (totalRow.getCell(7) as any).numFmt = '#,##0';
-                        totalRow.getCell(8).alignment = { horizontal: 'right' };
-                        (totalRow.getCell(8) as any).numFmt = '#,##0';
-                        totalRow.getCell(9).alignment = { horizontal: 'right' };
-                        (totalRow.getCell(9) as any).numFmt = '#,##0';
-                        totalRow.getCell(10).alignment = { horizontal: 'right' };
-                        (totalRow.getCell(10) as any).numFmt = '#,##0';
-
-                        // Add summary section
-                        worksheet.addRow([]);
-                        const summaryHeaderRow = worksheet.addRow(['RINGKASAN']);
-                        summaryHeaderRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
-                        summaryHeaderRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF006600' } };
-                        summaryHeaderRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-                        worksheet.mergeCells(`A${summaryHeaderRow.number}:C${summaryHeaderRow.number}`);
-
-                        const summaryData = [
-                          { label: 'Total Waybill', value: exportPreviewRows.length },
-                          { label: 'Total Koli', value: totalKoli },
-                          { label: 'Total Berat (kg)', value: totalBerat.toFixed(2) },
-                          { label: 'Total Ongkir', value: totalOngkir },
-                          { label: 'Total Asuransi', value: totalAsuransi },
-                          { label: 'Total Packing', value: totalPacking },
-                          { label: 'Total Keseluruhan', value: totalKeseluruhan },
-                        ];
-
-                        summaryData.forEach((item) => {
-                          const summaryRow = worksheet.addRow([item.label, item.value]);
-                          summaryRow.getCell(1).font = { bold: true };
-                          summaryRow.getCell(2).font = { bold: true };
-                          summaryRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
-                          summaryRow.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
-                          summaryRow.getCell(2).alignment = { horizontal: 'right' };
-                          (summaryRow.getCell(2) as any).numFmt = '#,##0';
-                        });
-
-                        // Freeze header and title rows
-                        worksheet.views = [{ state: 'frozen', ySplit: 4 }];
-
-                        const buffer = await workbook.xlsx.writeBuffer();
-                        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        const safeLabel = exportPeriodLabel.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '') || 'rekapan_export';
-                        link.href = url;
-                        link.download = `rekapan_${safeLabel}.xlsx`;
-                        document.body.appendChild(link);
-                        link.click();
-                        link.remove();
-                        URL.revokeObjectURL(url);
-                        setExportPreviewOpen(false);
-                        setExportPreviewRows([]);
-                        setExportSelectedMonth('');
-                        setExportPeriodLabel('');
-                        toast('Export Excel berhasil disiapkan.', 'success');
-                      } catch (err) {
-                        toast(getFriendlyErrorMessage(err), 'error');
-                      } finally {
-                        setExportLoading(false);
-                      }
-                    }}
-                    disabled={exportLoading}
-                    className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
-                  >
-                    {exportLoading ? 'Menyiapkan...' : 'Download Excel'}
-                  </button>
-                </div>
+                    <span className="self-center text-sky-300 transition group-hover:translate-x-1">→</span>
+                  </Link>
+                ))}
               </div>
             </div>
-          )}
+          </div>
+        </section>
 
-          {showForm && (
-            <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center bg-slate-950/90 p-4 backdrop-blur-sm">
-              <div className="relative w-full max-w-4xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl ring-1 ring-slate-200 max-h-[calc(100vh-4rem)] flex flex-col">
-                <RekapanForm editingId={editingId} onClose={handleFormClose} onDataChange={handleRefreshData} />
-              </div>
-            </div>
-          )}
-
-
-          <SummaryCards startDate={startDate} endDate={endDate} />
-
-          <section className="grid gap-8 xl:grid-cols-[1.45fr_0.9fr]">
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b border-slate-200 pb-4">
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Filter dan Cari</h2>
-                  <p className="mt-1 text-sm text-slate-500">Temukan rekapan berdasarkan kata kunci dan rentang tanggal.</p>
-                </div>
-              </div>
-              <div className="mt-6">
-                <SearchFilters
-                  searchTerm={searchTerm}
-                  onSearchChange={handleSearchChange}
-                  startDate={startDate}
-                  onStartDateChange={handleStartDateChange}
-                  endDate={endDate}
-                  onEndDateChange={handleEndDateChange}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-8 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Ringkasan Filter</h2>
-              <div className="mt-5 space-y-4 text-sm text-slate-600">
-                <div className="rounded-3xl bg-white p-4 shadow-sm">Pencarian: <span className="font-semibold text-slate-900">{searchTerm || 'Semua data'}</span></div>
-                <div className="rounded-3xl bg-white p-4 shadow-sm">Tanggal: <span className="font-semibold text-slate-900">{startDate || 'Awal'} - {endDate || 'Sekarang'}</span></div>
-                <div className="rounded-3xl bg-white p-4 shadow-sm">Halaman: <span className="font-semibold text-slate-900">{currentPage}</span></div>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-semibold text-slate-900">Daftar Rekapan</h2>
-                <p className="mt-1 text-sm text-slate-500">Kelola data pengiriman dengan cepat dan aman.</p>
-              </div>
-            </div>
-            <RekapanTable
-              searchTerm={searchTerm}
-              startDate={startDate}
-              endDate={endDate}
-              currentPage={currentPage}
-              refreshKey={refreshKey}
-              onPageChange={setCurrentPage}
-              onEdit={handleEdit}
-              onDataChange={handleRefreshData}
-            />
-          </section>
-        </div>
+        <section className="mt-10 grid gap-6 lg:grid-cols-3">
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.2)] backdrop-blur-xl">
+            <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Performa</p>
+            <p className="mt-4 text-3xl font-semibold text-white">Lebih cepat</p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">Antarmuka responsif dengan hierarki visual yang jelas.</p>
+          </div>
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.2)] backdrop-blur-xl">
+            <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Keamanan</p>
+            <p className="mt-4 text-3xl font-semibold text-white">Tingkat tinggi</p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">Desain menekankan kontras dan kejelasan data dalam lingkungan kerja yang aman.</p>
+          </div>
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.2)] backdrop-blur-xl">
+            <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Produktivitas</p>
+            <p className="mt-4 text-3xl font-semibold text-white">Lebih fokus</p>
+            <p className="mt-3 text-sm leading-6 text-slate-400">Navigasi modul yang mudah membuat pekerjaan menjadi lebih terorganisir.</p>
+          </div>
+        </section>
       </div>
     </main>
   );

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRekapanById, useCreateRekapan, useUpdateRekapan } from '@/hooks/useRekapan';
 import { CreateRekapanInput, MetodePembayaran } from '@/types';
-import { getFriendlyErrorMessage, formatDate, formatCurrency } from '@/lib/utils';
+import { getFriendlyErrorMessage, formatDate, formatCurrency, formatNumber, parseFormattedNumber } from '@/lib/utils';
 import { useToast } from '@/components/ToastProvider';
 // using emoji for the confirm icon to avoid extra icon dependency issues
 
@@ -150,8 +150,10 @@ export default function RekapanForm({ editingId, onClose, onDataChange }: Rekapa
         ? new Date(value)
         : name === 'beratKg'
         ? parseFloat(value) || 0
-        : ['jumlahKoli', 'ongkir', 'asuransi', 'packing'].includes(name)
+        : ['jumlahKoli'].includes(name)
         ? parseInt(value, 10) || 0
+        : ['ongkir', 'asuransi', 'packing'].includes(name)
+        ? Number(parseFormattedNumber(value) || 0)
         : value;
 
     setFormData((prev) => ({
@@ -159,6 +161,36 @@ export default function RekapanForm({ editingId, onClose, onDataChange }: Rekapa
       [name]: parsedValue,
     }));
   };
+
+  const originalValues = editData?.data
+    ? {
+        tanggal: new Date(editData.data.tanggal),
+        waybill: editData.data.waybill,
+        provinsi: editData.data.provinsi,
+        jenisBarang: editData.data.jenisBarang,
+        jumlahKoli: editData.data.jumlahKoli,
+        beratKg: editData.data.beratKg,
+        ongkir: editData.data.ongkir,
+        asuransi: editData.data.asuransi,
+        packing: editData.data.packing,
+        metodePembayaran: editData.data.metodePembayaran,
+      }
+    : null;
+
+  const changedFields = originalValues
+    ? {
+        tanggal: formData.tanggal.getTime() !== originalValues.tanggal.getTime(),
+        waybill: formData.waybill !== originalValues.waybill,
+        provinsi: formData.provinsi !== originalValues.provinsi,
+        jenisBarang: formData.jenisBarang !== originalValues.jenisBarang,
+        jumlahKoli: formData.jumlahKoli !== originalValues.jumlahKoli,
+        beratKg: formData.beratKg !== originalValues.beratKg,
+        ongkir: formData.ongkir !== originalValues.ongkir,
+        asuransi: formData.asuransi !== originalValues.asuransi,
+        packing: formData.packing !== originalValues.packing,
+        metodePembayaran: formData.metodePembayaran !== originalValues.metodePembayaran,
+      }
+    : null;
 
   if (isLoadingEdit && editingId) {
     return <div className="rounded-[1.5rem] bg-white p-6 shadow-sm text-center text-slate-500">Memuat data editor...</div>;
@@ -293,10 +325,10 @@ export default function RekapanForm({ editingId, onClose, onDataChange }: Rekapa
           <div className="flex flex-col">
             <label className="block text-sm font-semibold text-slate-700">Ongkir *</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               name="ongkir"
-              min="0"
-              value={formData.ongkir}
+              value={formatNumber(formData.ongkir)}
               onChange={handleChange}
               required
               className={
@@ -311,10 +343,10 @@ export default function RekapanForm({ editingId, onClose, onDataChange }: Rekapa
           <div className="flex flex-col">
             <label className="block text-sm font-semibold text-slate-700">Asuransi</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               name="asuransi"
-              min="0"
-              value={formData.asuransi}
+              value={formatNumber(formData.asuransi)}
               onChange={handleChange}
               className={
                 errors['asuransi']
@@ -328,10 +360,10 @@ export default function RekapanForm({ editingId, onClose, onDataChange }: Rekapa
           <div className="flex flex-col">
             <label className="block text-sm font-semibold text-slate-700">Packing</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               name="packing"
-              min="0"
-              value={formData.packing}
+              value={formatNumber(formData.packing)}
               onChange={handleChange}
               className={
                 errors['packing']
@@ -389,19 +421,77 @@ export default function RekapanForm({ editingId, onClose, onDataChange }: Rekapa
             ) : (
               <div className="w-full">
                 <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="font-medium text-slate-600">Tanggal</div>
-                    <div className="text-slate-900">{formatDate(formData.tanggal)}</div>
-                    <div className="font-medium text-slate-600">Waybill</div>
-                    <div className="text-slate-900">{formData.waybill || '-'}</div>
-                    <div className="font-medium text-slate-600">Provinsi</div>
-                    <div className="text-slate-900">{formData.provinsi || '-'}</div>
-                    <div className="font-medium text-slate-600">Jenis</div>
-                    <div className="text-slate-900">{formData.jenisBarang || '-'}</div>
-                    <div className="font-medium text-slate-600">Koli</div>
-                    <div className="text-slate-900">{formatCurrency(formData.jumlahKoli)}</div>
-                    <div className="font-medium text-slate-600">Berat (Kg)</div>
-                    <div className="text-slate-900">{formData.beratKg}</div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="font-medium text-slate-600">Tanggal</div>
+                      <div className="flex items-center gap-2 text-slate-900">
+                        {formatDate(formData.tanggal)}
+                        {changedFields?.tanggal ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-700">Diedit</span> : null}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="font-medium text-slate-600">Waybill</div>
+                      <div className="flex items-center gap-2 text-slate-900">
+                        {formData.waybill || '-'}
+                        {changedFields?.waybill ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-700">Diedit</span> : null}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="font-medium text-slate-600">Provinsi</div>
+                      <div className="flex items-center gap-2 text-slate-900">
+                        {formData.provinsi || '-'}
+                        {changedFields?.provinsi ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-700">Diedit</span> : null}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="font-medium text-slate-600">Jenis</div>
+                      <div className="flex items-center gap-2 text-slate-900">
+                        {formData.jenisBarang || '-'}
+                        {changedFields?.jenisBarang ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-700">Diedit</span> : null}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="font-medium text-slate-600">Koli</div>
+                      <div className="flex items-center gap-2 text-slate-900">
+                        {formatNumber(formData.jumlahKoli)}
+                        {changedFields?.jumlahKoli ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-700">Diedit</span> : null}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="font-medium text-slate-600">Berat (Kg)</div>
+                      <div className="flex items-center gap-2 text-slate-900">
+                        {formData.beratKg}
+                        {changedFields?.beratKg ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-700">Diedit</span> : null}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="font-medium text-slate-600">Ongkir</div>
+                      <div className="flex items-center gap-2 text-slate-900">
+                        {formatCurrency(formData.ongkir)}
+                        {changedFields?.ongkir ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-700">Diedit</span> : null}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="font-medium text-slate-600">Asuransi</div>
+                      <div className="flex items-center gap-2 text-slate-900">
+                        {formatCurrency(formData.asuransi)}
+                        {changedFields?.asuransi ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-700">Diedit</span> : null}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="font-medium text-slate-600">Packing</div>
+                      <div className="flex items-center gap-2 text-slate-900">
+                        {formatCurrency(formData.packing)}
+                        {changedFields?.packing ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-700">Diedit</span> : null}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="font-medium text-slate-600">Metode Pembayaran</div>
+                      <div className="flex items-center gap-2 text-slate-900">
+                        {formData.metodePembayaran}
+                        {changedFields?.metodePembayaran ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-700">Diedit</span> : null}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-3 justify-end">

@@ -6,10 +6,10 @@ services:
     container_name: jnt_rekap_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: jnt_rekap
-      MYSQL_USER: jnt_user
-      MYSQL_PASSWORD: jnt_password
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
     ports:
       - "3306:3306"
     volumes:

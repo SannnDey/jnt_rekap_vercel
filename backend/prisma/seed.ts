@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
-const metodePembayaran = ['TRANSFER', 'CASH', 'TF_CASH', 'PICKUP_ONLINE', 'BULANAN'];
+const metodePembayaran = ['TRANSFER', 'CASH', 'TF_CASH', 'PICKUP_ONLINE', 'BULANAN', 'DFOD'];
 
 const provinces = [
   'Aceh',

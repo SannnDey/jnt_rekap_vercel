@@ -15,6 +15,10 @@ interface RekapanTableProps {
   onPageChange: (page: number) => void;
   onEdit: (id: string) => void;
   onDataChange: () => void;
+  provinsi: string;
+  metodePembayaran: string;
+  sortBy: string;
+  sortOrder: 'asc' | 'desc' | '';
 }
 
 export default function RekapanTable({
@@ -26,6 +30,10 @@ export default function RekapanTable({
   onPageChange,
   onEdit,
   onDataChange,
+  provinsi,
+  metodePembayaran,
+  sortBy,
+  sortOrder,
 }: RekapanTableProps) {
   const { data, isLoading, isError, error } = useRekapanList(
     currentPage,
@@ -33,6 +41,10 @@ export default function RekapanTable({
     searchTerm || undefined,
     startDate || undefined,
     endDate || undefined,
+    provinsi || undefined,
+    metodePembayaran || undefined,
+    sortBy || undefined,
+    sortOrder || undefined,
     refreshKey
   );
 

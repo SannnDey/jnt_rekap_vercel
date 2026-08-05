@@ -6,6 +6,7 @@ export const MetodePembayaranEnum = z.enum([
   'TF_CASH',
   'PICKUP_ONLINE',
   'BULANAN',
+  'DFOD',
 ]);
 
 export const CreateRekapanOutgoingSchema = z.object({
@@ -23,22 +24,22 @@ export const CreateRekapanOutgoingSchema = z.object({
     .min(1, 'Jenis barang harus diisi')
     .max(150, 'Jenis barang maksimal 150 karakter'),
   jumlahKoli: z
-    .number()
+    .coerce.number()
     .int()
     .positive('Jumlah koli harus > 0'),
   beratKg: z
-    .number()
+    .coerce.number()
     .positive('Berat harus > 0'),
   ongkir: z
-    .number()
+    .coerce.number()
     .int()
     .min(0, 'Ongkir tidak boleh negatif'),
   asuransi: z
-    .number()
+    .coerce.number()
     .int()
     .min(0, 'Asuransi tidak boleh negatif'),
   packing: z
-    .number()
+    .coerce.number()
     .int()
     .min(0, 'Packing tidak boleh negatif'),
   metodePembayaran: MetodePembayaranEnum,
