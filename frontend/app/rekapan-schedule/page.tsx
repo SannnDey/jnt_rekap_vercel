@@ -32,6 +32,13 @@ const driverStatuses: DriverAttendanceStatus[] = [
   'GW Setengah',
 ];
 
+const driverPresenceStatuses: DriverAttendanceStatus[] = [
+  'Hadir',
+  'Full GW + Deliv',
+  'Full GW No Deliv',
+  'GW Setengah',
+];
+
 const statusStyle: Record<string, string> = {
   Hadir: 'bg-emerald-100 text-emerald-700',
   Sakit: 'bg-amber-100 text-amber-700',
@@ -55,6 +62,14 @@ const mapAttendanceRecord = (attendance: ScheduleAttendanceApi): AttendanceRecor
   createdAt: attendance.createdAt,
 });
 
+const isDriverPresentStatus = (status: DriverAttendanceStatus) =>
+  driverPresenceStatuses.includes(status);
+
+const isAttendancePresent = (record: AttendanceRecord) =>
+  record.role === 'Driver'
+    ? isDriverPresentStatus(record.kehadiran)
+    : record.kehadiran === 'Hadir';
+
 export default function RekapanSchedulePage() {
   const { toast } = useToast();
   const [tanggal, setTanggal] = useState(() => new Date().toISOString().slice(0, 10));
@@ -77,6 +92,11 @@ export default function RekapanSchedulePage() {
     partnerId: '',
   });
   const [exportLoading, setExportLoading] = useState(false);
+  const [exportPreviewOpen, setExportPreviewOpen] = useState(false);
+  const [exportPreviewLoading, setExportPreviewLoading] = useState(false);
+  const [exportPreviewRows, setExportPreviewRows] = useState<AttendanceRecord[]>([]);
+  const [exportSelectedMonth, setExportSelectedMonth] = useState('');
+  const [exportPeriodLabel, setExportPeriodLabel] = useState('');
 
   const { data: employees = [] } = useScheduleEmployees();
   const { data: attendances = [] } = useScheduleAttendances();
@@ -109,8 +129,23 @@ export default function RekapanSchedulePage() {
     [attendances]
   );
 
+  const totalEmployees = employees.length;
+  const todayString = new Date().toISOString().slice(0, 10);
+  const todaysAttendanceCount = useMemo(
+    () => attendanceRecords.filter((record) => record.tanggal === todayString).length,
+    [attendanceRecords, todayString]
+  );
+  const todaysPresentCount = useMemo(
+    () => attendanceRecords.filter((record) => record.tanggal === todayString && isAttendancePresent(record)).length,
+    [attendanceRecords, todayString]
+  );
+
   const adminRecords = attendanceRecords.filter((record) => record.role === 'Admin');
   const driverRecords = attendanceRecords.filter((record) => record.role === 'Driver');
+  const driverPresentCount = useMemo(
+    () => driverRecords.filter((record) => isDriverPresentStatus(record.kehadiran)).length,
+    [driverRecords]
+  );
   const totalRecords = attendanceRecords.length;
 
   const handleEmployeeChange = (value: string) => {
@@ -130,6 +165,18 @@ export default function RekapanSchedulePage() {
     if (!tanggal || !selectedEmployee) return false;
     if (kehadiran === 'GW Setengah' && !partnerId) return false;
     return true;
+  };
+
+  const getMonthRange = (month: string) => {
+    if (!month) return null;
+    const [year, monthValue] = month.split('-');
+    const yearNum = Number(year);
+    const monthNum = Number(monthValue);
+    if (!yearNum || !monthNum) return null;
+    const startDate = `${year}-${monthValue}-01`;
+    const lastDay = new Date(yearNum, monthNum, 0).getDate();
+    const endDate = `${year}-${monthValue}-${String(lastDay).padStart(2, '0')}`;
+    return { startDate, endDate };
   };
 
   const handleCreateEmployee = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -255,11 +302,15 @@ export default function RekapanSchedulePage() {
     );
   };
 
-  const downloadExcel = async () => {
-    if (attendanceRecords.length === 0) {
+  const downloadExcel = async (rows: AttendanceRecord[] = attendanceRecords, label = exportPeriodLabel) => {
+    if (rows.length === 0) {
       toast('Tidak ada data kehadiran untuk diekspor.', 'error');
       return;
     }
+
+    const adminRows = rows.filter((record) => record.role === 'Admin');
+    const driverRows = rows.filter((record) => record.role === 'Driver');
+    const labelValue = label || computeExportMonthLabel(new Date().toISOString().slice(0, 7));
 
     setExportLoading(true);
     try {
@@ -268,28 +319,38 @@ export default function RekapanSchedulePage() {
       const worksheet = workbook.addWorksheet('Rekap Schedule');
 
       worksheet.columns = [
-        { header: 'Tanggal', key: 'tanggal', width: 14 },
-        { header: 'Nama', key: 'employeeName', width: 22 },
-        { header: 'Jabatan', key: 'role', width: 14 },
-        { header: 'Kehadiran', key: 'kehadiran', width: 22 },
-        { header: 'Keterangan', key: 'keterangan', width: 32 },
-        { header: 'Partner Driver', key: 'partnerName', width: 22 },
+        { key: 'tanggal', width: 14 },
+        { key: 'employeeName', width: 22 },
+        { key: 'role', width: 14 },
+        { key: 'kehadiran', width: 22 },
+        { key: 'keterangan', width: 32 },
+        { key: 'partnerName', width: 22 },
       ];
 
-      worksheet.addRow(['REKAP SCHEDULE KARYAWAN']);
+      worksheet.addRow(['REKAP SCHEDULE KEHADIRAN']);
       worksheet.mergeCells('A1:F1');
-      worksheet.getCell('A1').font = { bold: true, size: 14 };
-      worksheet.getCell('A1').alignment = { horizontal: 'center' };
+      worksheet.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+      worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+      worksheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0EA5E9' } };
       worksheet.addRow([]);
-      worksheet.addRow(['Total Rekap', totalRecords]);
-      worksheet.addRow(['Admin', adminRecords.length]);
-      worksheet.addRow(['Driver', driverRecords.length]);
-      worksheet.addRow([]);
+      worksheet.addRow(['Periode', labelValue]);
       worksheet.addRow([]);
 
-      worksheet.getRow(6).font = { bold: true };
-      attendanceRecords.forEach((record) => {
-        worksheet.addRow({
+      const headerRow = worksheet.addRow(['Tanggal', 'Nama', 'Jabatan', 'Kehadiran', 'Keterangan', 'Partner Driver']);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+      headerRow.eachCell((cell: any) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          right: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        };
+      });
+
+      rows.forEach((record, index) => {
+        const excelRow = worksheet.addRow({
           tanggal: record.tanggal,
           employeeName: record.employeeName,
           role: record.role,
@@ -297,7 +358,128 @@ export default function RekapanSchedulePage() {
           keterangan: record.keterangan || '',
           partnerName: record.partnerName || '',
         });
+        excelRow.alignment = { vertical: 'middle', wrapText: true };
+        if (index % 2 === 1) {
+          excelRow.eachCell((cell: any) => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+          });
+        }
+        excelRow.eachCell((cell: any) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          };
+        });
       });
+
+      worksheet.views = [{ state: 'frozen', ySplit: 4 }];
+
+      const adminStatusKeys = ['Hadir', 'Sakit', 'Izin', 'Alpha'] as const;
+      const driverStatusKeys = ['Hadir', 'Sakit', 'Izin', 'Alpha', 'Full GW + Deliv', 'Full GW No Deliv', 'GW Setengah', 'Total Hadir'] as const;
+      type AdminStatusKey = (typeof adminStatusKeys)[number];
+      type DriverStatusKey = (typeof driverStatusKeys)[number];
+      type AllStatusKey = AdminStatusKey | DriverStatusKey;
+
+      const createAttendanceCounts = (sourceRows: AttendanceRecord[], statusKeys: readonly AllStatusKey[]) =>
+        sourceRows.reduce<Record<string, Record<AllStatusKey, number>>>((acc, record) => {
+          const name = record.employeeName;
+          if (!acc[name]) {
+            acc[name] = statusKeys.reduce((map, key) => {
+              map[key] = 0;
+              return map;
+            }, {} as Record<AllStatusKey, number>);
+          }
+          const status = record.kehadiran as AllStatusKey;
+          if (statusKeys.includes(status)) {
+            acc[name][status] += 1;
+          }
+          return acc;
+        }, {} as Record<string, Record<AllStatusKey, number>>);
+
+      const adminCounts = createAttendanceCounts(adminRows, adminStatusKeys);
+      const driverCounts = createAttendanceCounts(driverRows, driverStatusKeys);
+      const driverPresentCounts = driverRows.reduce<Record<string, number>>((acc, record) => {
+        const name = record.employeeName;
+        if (!acc[name]) acc[name] = 0;
+        if (isDriverPresentStatus(record.kehadiran)) acc[name] += 1;
+        return acc;
+      }, {});
+
+      Object.entries(driverPresentCounts).forEach(([name, value]) => {
+        if (!driverCounts[name]) {
+          driverCounts[name] = driverStatusKeys.reduce((map, key) => {
+            map[key] = 0;
+            return map;
+          }, {} as Record<AllStatusKey, number>);
+        }
+        driverCounts[name]['Total Hadir' as AllStatusKey] = value;
+      });
+
+      const summarySheet = workbook.addWorksheet('Ringkasan Kehadiran');
+      summarySheet.columns = [
+        { width: 20 },
+        { width: 10 },
+        { width: 10 },
+        { width: 10 },
+        { width: 10 },
+        { width: 16 },
+        { width: 16 },
+        { width: 12 },
+      ];
+
+      summarySheet.addRow(['RINGKASAN KEHADIRAN']);
+      summarySheet.mergeCells('A1:H1');
+      summarySheet.getCell('A1').font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+      summarySheet.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0EA5E9' } };
+      summarySheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+      summarySheet.addRow([]);
+      summarySheet.addRow(['Periode', labelValue]);
+      summarySheet.addRow([]);
+
+      const addSummarySection = (sheet: any, title: string, counts: Record<string, Record<AllStatusKey, number>>, statusKeys: readonly AllStatusKey[]) => {
+        sheet.addRow([title]);
+        const titleRow = sheet.getRow(sheet.lastRow.number);
+        titleRow.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+        sheet.mergeCells(`A${titleRow.number}:H${titleRow.number}`);
+        titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
+        titleRow.alignment = { horizontal: 'left', vertical: 'middle' };
+        sheet.addRow([]);
+
+        const header = sheet.addRow(['Nama', ...statusKeys]);
+        header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        header.alignment = { horizontal: 'center', vertical: 'middle' };
+        header.eachCell((cell: any) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            right: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          };
+        });
+
+        Object.entries(counts).forEach(([name, statusCounts]) => {
+          const rowValues = [name, ...statusKeys.map((key) => statusCounts[key] ?? 0)];
+          const row = sheet.addRow(rowValues);
+          row.alignment = { vertical: 'middle', horizontal: 'center' };
+          row.eachCell((cell: any) => {
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            };
+          });
+        });
+
+        sheet.addRow([]);
+      };
+
+      addSummarySection(summarySheet, 'Admin Summary', adminCounts, adminStatusKeys);
+      addSummarySection(summarySheet, 'Driver Summary', driverCounts, driverStatusKeys);
+      summarySheet.views = [{ state: 'frozen', ySplit: 4 }];
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], {
@@ -305,7 +487,8 @@ export default function RekapanSchedulePage() {
       });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const filename = `rekapan_schedule_${computeExportMonthLabel(new Date().toISOString().slice(0, 7)).replace(/\s+/g, '_')}.xlsx`;
+      const safeLabel = labelValue.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '') || 'rekapan_schedule';
+      const filename = `rekapan_schedule_${safeLabel}.xlsx`;
       link.href = url;
       link.download = filename;
       document.body.appendChild(link);
@@ -366,6 +549,159 @@ export default function RekapanSchedulePage() {
           </div>
         </section>
 
+        {exportPreviewOpen && (
+          <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center bg-slate-950/80 px-4 py-8 backdrop-blur-sm">
+            <div className="w-full max-w-5xl overflow-hidden rounded-[1.75rem] bg-white shadow-2xl ring-1 ring-slate-200">
+              <div className="border-b border-slate-200 bg-slate-50 px-6 py-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold text-slate-900">Preview Export Rekap Schedule</h3>
+                    <p className="mt-1 text-sm text-slate-500">Pilih bulan lalu tampilkan preview sebelum mengunduh file Excel.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExportPreviewOpen(false);
+                      setExportPreviewRows([]);
+                      setExportSelectedMonth('');
+                      setExportPeriodLabel('');
+                    }}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              </div>
+              <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+                <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+                    <p className="text-sm font-semibold text-slate-700">Pilih Bulan Ekspor</p>
+                    <p className="mt-2 text-sm text-slate-500">Pilih periode untuk melihat data kehadiran yang akan diunduh.</p>
+                    <input
+                      type="month"
+                      value={exportSelectedMonth}
+                      onChange={(e) => setExportSelectedMonth(e.target.value)}
+                      className="mt-4 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500"
+                    />
+                    <p className="mt-3 text-sm text-slate-600">
+                      Bulan terpilih: <span className="font-semibold text-slate-900">{exportSelectedMonth ? computeExportMonthLabel(exportSelectedMonth) : 'Belum dipilih'}</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!exportSelectedMonth) {
+                          toast('Pilih bulan export terlebih dahulu.', 'error');
+                          return;
+                        }
+                        const range = getMonthRange(exportSelectedMonth);
+                        if (!range) {
+                          toast('Periode bulan tidak valid.', 'error');
+                          return;
+                        }
+                        setExportPreviewLoading(true);
+                        const rows = attendanceRecords.filter((record) => record.tanggal >= range.startDate && record.tanggal <= range.endDate);
+                        if (rows.length === 0) {
+                          toast('Tidak ada data untuk bulan tersebut.', 'error');
+                          setExportPreviewRows([]);
+                          setExportPeriodLabel('');
+                          setExportPreviewLoading(false);
+                          return;
+                        }
+                        setExportPreviewRows(rows);
+                        setExportPeriodLabel(computeExportMonthLabel(exportSelectedMonth));
+                        setExportPreviewLoading(false);
+                      }}
+                      className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
+                    >
+                      {exportPreviewLoading ? 'Memuat preview...' : 'Tampilkan Preview'}
+                    </button>
+                  </div>
+
+                  <div className="rounded-3xl bg-slate-50 p-5 shadow-sm">
+                    <p className="text-sm font-semibold text-slate-700">Ringkasan</p>
+                    <div className="mt-4 space-y-3 text-sm text-slate-600">
+                      <div className="rounded-3xl bg-white p-4 shadow-sm">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Periode Ekspor</p>
+                        <p className="mt-2 font-semibold text-slate-900">{exportPeriodLabel || (exportSelectedMonth ? computeExportMonthLabel(exportSelectedMonth) : 'Belum dipilih')}</p>
+                      </div>
+                      <div className="rounded-3xl bg-white p-4 shadow-sm">
+                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Baris</p>
+                        <p className="mt-2 font-semibold text-slate-900">{exportPreviewRows.length}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {exportPreviewRows.length > 0 && (
+                  <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                      <thead className="bg-slate-100 text-slate-900">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold">No</th>
+                          <th className="px-4 py-3 text-left font-semibold">Tanggal</th>
+                          <th className="px-4 py-3 text-left font-semibold">Nama</th>
+                          <th className="px-4 py-3 text-left font-semibold">Jabatan</th>
+                          <th className="px-4 py-3 text-left font-semibold">Kehadiran</th>
+                          <th className="px-4 py-3 text-left font-semibold">Partner</th>
+                          <th className="px-4 py-3 text-left font-semibold">Keterangan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 bg-white">
+                        {exportPreviewRows.slice(0, 8).map((record, index) => (
+                          <tr key={record.id} className="hover:bg-slate-50">
+                            <td className="whitespace-nowrap px-4 py-3 text-slate-600">{index + 1}</td>
+                            <td className="px-4 py-3 text-slate-700">{record.tanggal}</td>
+                            <td className="px-4 py-3 text-slate-700">{record.employeeName}</td>
+                            <td className="px-4 py-3 text-slate-700">{record.role}</td>
+                            <td className="px-4 py-3 text-slate-700">{record.kehadiran}</td>
+                            <td className="px-4 py-3 text-slate-700">{record.partnerName || '-'}</td>
+                            <td className="px-4 py-3 text-slate-700">{record.keterangan || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {exportPreviewRows.length > 8 && (
+                      <div className="p-4 text-sm text-slate-500">Menampilkan 8 dari {exportPreviewRows.length} baris.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExportPreviewOpen(false);
+                    setExportPreviewRows([]);
+                    setExportSelectedMonth('');
+                    setExportPeriodLabel('');
+                  }}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (exportPreviewRows.length === 0) {
+                      toast('Tampilkan preview terlebih dahulu sebelum download.', 'error');
+                      return;
+                    }
+                    await downloadExcel(exportPreviewRows, exportPeriodLabel || computeExportMonthLabel(exportSelectedMonth));
+                    setExportPreviewOpen(false);
+                    setExportPreviewRows([]);
+                    setExportSelectedMonth('');
+                    setExportPeriodLabel('');
+                  }}
+                  disabled={exportLoading}
+                  className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
+                >
+                  {exportLoading ? 'Menyiapkan...' : 'Download Excel'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-8 shadow-2xl shadow-slate-200/40 backdrop-blur-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -415,11 +751,16 @@ export default function RekapanSchedulePage() {
             </div>
             <button
               type="button"
-              onClick={downloadExcel}
+              onClick={() => {
+                setExportSelectedMonth((current) => current || new Date().toISOString().slice(0, 7));
+                setExportPreviewRows([]);
+                setExportPeriodLabel('');
+                setExportPreviewOpen(true);
+              }}
               disabled={exportLoading}
               className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-400"
             >
-              {exportLoading ? 'Membuat Excel...' : 'Export ke Excel'}
+              {exportLoading ? 'Mempersiapkan...' : 'Export ke Excel'}
             </button>
           </div>
 
@@ -530,6 +871,7 @@ export default function RekapanSchedulePage() {
               <span className="rounded-full bg-slate-100 px-4 py-2 text-sm text-slate-700">Total: {totalRecords}</span>
               <span className="rounded-full bg-emerald-100 px-4 py-2 text-sm text-emerald-700">Admin: {adminRecords.length}</span>
               <span className="rounded-full bg-cyan-100 px-4 py-2 text-sm text-cyan-700">Driver: {driverRecords.length}</span>
+              <span className="rounded-full bg-emerald-50 px-4 py-2 text-sm text-emerald-700">Hadir Driver: {driverPresentCount}</span>
             </div>
           </div>
 
