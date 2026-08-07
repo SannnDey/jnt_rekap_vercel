@@ -23,6 +23,12 @@ const modules = [
     accent: 'from-emerald-500 to-lime-500',
   },
   {
+    title: 'Rekapan Schedule',
+    description: 'Lihat ringkasan jadwal operasional dan status tugas shift.',
+    href: '/rekapan-schedule',
+    accent: 'from-cyan-500 to-sky-500',
+  },
+  {
     title: 'Rekapan Kasbon',
     description: 'Pantau kasbon per karyawan dan riwayat transaksi.',
     href: '/rekapan-kasbon',

@@ -67,12 +67,25 @@ async function main() {
 
     // Clear existing data
     console.log('🧹 Clearing existing data...');
+    await prisma.scheduleAttendance.deleteMany();
+    await prisma.employee.deleteMany();
     const deletedCount = await prisma.rekapanOutgoing.deleteMany();
     if (deletedCount.count > 0) {
       console.log(`✓ Deleted ${deletedCount.count} existing records`);
     } else {
       console.log('✓ No existing records to delete');
     }
+
+    // Seed employee data
+    console.log('\n👥 Seeding karyawan contoh...');
+    const admin = await prisma.employee.create({
+      data: { name: 'Ihsan', role: 'Admin' },
+    });
+    const driver = await prisma.employee.create({
+      data: { name: 'Agus', role: 'Driver' },
+    });
+
+    console.log(`✓ Seeded employees: ${admin.name}, ${driver.name}\n`);
 
     // Generate sample data
     console.log('\n📝 Generating sample data...');

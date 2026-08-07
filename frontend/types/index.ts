@@ -152,3 +152,53 @@ export interface PengeluaranSummary {
   byKategori: PengeluaranSummaryByKategori[];
   byMetode: PengeluaranSummaryByMetode[];
 }
+
+export interface ScheduleRecap {
+  id: string;
+  tanggal: string;
+  shift: string;
+  lokasi: string;
+  penanggungJawab: string;
+  status: 'Selesai' | 'Tertunda' | 'Batal';
+}
+
+export type AttendanceStatus = 'Hadir' | 'Sakit' | 'Izin' | 'Alpha';
+export type DriverAttendanceStatus = AttendanceStatus | 'Full GW + Deliv' | 'Full GW No Deliv' | 'GW Setengah';
+
+export interface Employee {
+  id: string;
+  name: string;
+  role: 'Admin' | 'Driver';
+}
+
+export interface AttendanceRecord {
+  id: string;
+  tanggal: string;
+  employeeId: string;
+  employeeName: string;
+  role: 'Admin' | 'Driver';
+  kehadiran: DriverAttendanceStatus;
+  keterangan?: string;
+  partnerId?: string;
+  partnerName?: string;
+  createdAt: string;
+}
+
+export interface ScheduleEmployee {
+  id: string;
+  name: string;
+  role: 'Admin' | 'Driver';
+}
+
+export interface ScheduleAttendanceApi {
+  id: string;
+  tanggal: string;
+  employeeId: string;
+  attendanceStatus: string;
+  keterangan?: string | null;
+  partnerId?: string | null;
+  partner?: ScheduleEmployee | null;
+  employee: ScheduleEmployee;
+  createdAt: string;
+  updatedAt: string;
+}

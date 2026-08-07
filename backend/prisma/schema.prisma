@@ -99,15 +99,61 @@ model Pengeluaran {
   jenis            String   @db.VarChar(255)
   nominal          Int
   metodePembayaran MetodePembayaran
-  kategori         String   @db.VarChar(100) // e.g., 'Pengeluaran Harian' or 'Pengeluaran Outgoing'
-  tipeKendaraan    String?  @db.VarChar(150)
+  kategori         String   @db.VarChar(100) // e.g., 'Pengeluaran Harian', 'Pengeluaran Outgoing' or 'Pengeluaran BBM'
   jenisBahanBakar  String?  @db.VarChar(150)
-  liter            Float?
   km               Int?
+  liter            Float?
+  tipeKendaraan    String?  @db.VarChar(150)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@index([tanggal])
   @@index([kategori])
   @@map("pengeluaran")
+}
+
+model Employee {
+  id              String               @id @default(uuid()) @db.Char(36)
+  name            String               @db.VarChar(150)
+  role            Role
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  attendances     ScheduleAttendance[]  @relation("EmployeeAttendances")
+  partnerAttendances ScheduleAttendance[] @relation("PartnerAttendances")
+
+  @@index([name])
+  @@map("employee")
+}
+
+model ScheduleAttendance {
+  id               String   @id @default(uuid()) @db.Char(36)
+  tanggal          DateTime
+  employee         Employee @relation("EmployeeAttendances", fields: [employeeId], references: [id])
+  employeeId       String   @db.Char(36)
+  attendanceStatus AttendanceStatus
+  keterangan       String?  @db.Text
+  partner         Employee? @relation("PartnerAttendances", fields: [partnerId], references: [id])
+  partnerId       String?   @db.Char(36)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tanggal])
+  @@index([employeeId])
+  @@index([attendanceStatus])
+  @@map("schedule_attendance")
+}
+
+enum Role {
+  Admin
+  Driver
+}
+
+enum AttendanceStatus {
+  Hadir
+  Sakit
+  Izin
+  Alpha
+  Full_GW_Deliv
+  Full_GW_No_Deliv
+  GW_Setengah
 }

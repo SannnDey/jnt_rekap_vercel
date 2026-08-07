@@ -8,6 +8,9 @@ import {
   SummaryData,
   KasbonRecord,
   KasbonSummary,
+  Employee,
+  ScheduleAttendanceApi,
+  ScheduleEmployee,
 } from '@/types';
 import {
   RekapanInternalRecord,
@@ -176,6 +179,58 @@ class ApiClient {
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
     const response = await this.client.get('/rekapan-internal/summary', { params });
+    return response.data;
+  }
+
+  async getScheduleEmployees(): Promise<ApiResponse<Employee[]>> {
+    const response = await this.client.get('/schedule/employees');
+    return response.data;
+  }
+
+  async createScheduleEmployee(data: { name: string; role: 'Admin' | 'Driver' }): Promise<ApiResponse<ScheduleEmployee>> {
+    const response = await this.client.post('/schedule/employees', data);
+    return response.data;
+  }
+
+  async getScheduleAttendances(employeeId?: string, role?: string, startDate?: string, endDate?: string): Promise<ApiResponse<ScheduleAttendanceApi[]>> {
+    const params: any = {};
+    if (employeeId) params.employeeId = employeeId;
+    if (role) params.role = role;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await this.client.get('/schedule/attendances', { params });
+    return response.data;
+  }
+
+  async createScheduleAttendance(data: {
+    tanggal: string | Date;
+    employeeId: string;
+    attendanceStatus: string;
+    keterangan?: string;
+    partnerId?: string;
+  }): Promise<ApiResponse<any>> {
+    const response = await this.client.post('/schedule/attendances', data);
+    return response.data;
+  }
+
+  async updateScheduleAttendance(id: string, data: {
+    tanggal?: string | Date;
+    employeeId?: string;
+    attendanceStatus?: string;
+    keterangan?: string;
+    partnerId?: string;
+  }): Promise<ApiResponse<any>> {
+    const response = await this.client.put(`/schedule/attendances/${id}`, data);
+    return response.data;
+  }
+
+  async deleteScheduleAttendance(id: string): Promise<ApiResponse<any>> {
+    const response = await this.client.delete(`/schedule/attendances/${id}`);
+    return response.data;
+  }
+
+  async getScheduleSummary(): Promise<ApiResponse<any>> {
+    const response = await this.client.get('/schedule/summary');
     return response.data;
   }
 
