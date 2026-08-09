@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model RekapanOutgoing {
+  id                  String   @id @default(uuid()) @db.Char(36)
+  tanggalRekap        DateTime @default(now())
+  tanggal             DateTime
+  waybill             String   @db.VarChar(100)
+  provinsi            String   @db.VarChar(100)
+  jenisBarang         String   @db.VarChar(150)
+  jumlahKoli          Int
+  beratKg             Float
+  ongkir              Int
+  asuransi            Int
+  packing             Int
+  total               Int
+  metodePembayaran    MetodePembayaran
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  @@index([tanggal])
+  @@index([waybill])
+  @@index([metodePembayaran])
+  @@map("rekapan_outgoing")
+}
+
+model RekapanInternal {
+  id                    String   @id @default(uuid()) @db.Char(36)
+  tanggalRekap          DateTime @default(now())
+  waybill               String   @db.VarChar(100)
+  sprinterDelivery      String   @db.VarChar(150)
+  jumlahKoli            Int
+  jumlahPembayaranCOD   Int
+  biayaDFOD             Int
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  @@index([tanggalRekap])
+  @@index([createdAt])
+  @@index([waybill])
+  @@map("rekapan_internal")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid()) @db.Char(36)
+  type      String   @db.VarChar(100)
+  details   String?  @db.Text
+  user      String?  @db.VarChar(100)
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([createdAt])
+  @@map("activity_log")
+}
+
+enum MetodePembayaran {
+  TRANSFER
+  CASH
+  TF_CASH
+  PICKUP_ONLINE
+  BULANAN
+  DFOD
+  @@map("metode_pembayaran")
+}
+
+model Kasbon {
+  id          String   @id @default(uuid()) @db.Char(36)
+  employee    String   @db.VarChar(150)
+  tanggal     DateTime
+  amount      Int
+  description String?  @db.Text
+  settled     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([employee])
+  @@index([tanggal])
+  @@map("kasbon")
+}
+
+model Pengeluaran {
+  id               String   @id @default(uuid()) @db.Char(36)
+  tanggal          DateTime
+  jenis            String   @db.VarChar(255)
+  nominal          Int
+  metodePembayaran MetodePembayaran
+  kategori         String   @db.VarChar(100)
+  jenisBahanBakar  String?  @db.VarChar(150)
+  km               Int?
+  liter            Float?
+  tipeKendaraan    String?  @db.VarChar(150)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  @@index([tanggal])
+  @@index([kategori])
+  @@map("pengeluaran")
+}
+
+model Employee {
+  id              String               @id @default(uuid()) @db.Char(36)
+  name            String               @db.VarChar(150)
+  role            Role
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  attendances     ScheduleAttendance[]  @relation("EmployeeAttendances")
+  partnerAttendances ScheduleAttendance[] @relation("PartnerAttendances")
+  @@index([name])
+  @@map("employee")
+}
+
+model ScheduleAttendance {
+  id               String   @id @default(uuid()) @db.Char(36)
+  tanggal          DateTime
+  employee         Employee @relation("EmployeeAttendances", fields: [employeeId], references: [id])
+  employeeId       String   @db.Char(36)
+  attendanceStatus AttendanceStatus
+  keterangan       String?  @db.Text
+  partner         Employee? @relation("PartnerAttendances", fields: [partnerId], references: [id])
+  partnerId       String?   @db.Char(36)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([tanggal])
+  @@index([employeeId])
+  @@index([attendanceStatus])
+  @@map("schedule_attendance")
+}
+
+enum Role {
+  Admin
+  Driver
+}
+
+enum AttendanceStatus {
+  Hadir
+  Sakit
+  Izin
+  Alpha
+  Full_GW_Deliv
+  Full_GW_No_Deliv
+  GW_Setengah
+}

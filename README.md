@@ -228,10 +228,17 @@ npm start
 ```
 
 ### Frontend (Vercel)
+- Deploy project dari folder `frontend` sebagai root project.
+- Pastikan environment variables di Vercel:
+  - `DATABASE_URL` = `mysql://username:password@host:3306/jnt_recap`
+  - `NEXT_PUBLIC_API_URL` = `/api`
+
 ```bash
-# Auto-deploy dari repository
-vercel
+# Build di Vercel
+npm run build
 ```
+
+> Jika memakai CLI, jalankan `vercel` dari folder `frontend` atau pilih `frontend` sebagai project root di dashboard Vercel.
 
 ## 🐛 Troubleshooting
 
