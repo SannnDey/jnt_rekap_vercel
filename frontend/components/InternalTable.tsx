@@ -15,6 +15,7 @@ interface InternalTableProps {
   onPageChange: (page: number) => void;
   onEdit: (id: string) => void;
   onDataChange: () => void;
+  readOnly?: boolean;
 }
 
 export default function InternalTable({
@@ -26,6 +27,7 @@ export default function InternalTable({
   onPageChange,
   onEdit,
   onDataChange,
+  readOnly = false,
 }: InternalTableProps) {
   const { data, isLoading, isError, error } = useInternalList(
     currentPage,
@@ -93,7 +95,7 @@ export default function InternalTable({
               <th className="px-5 py-4 text-center font-semibold">Koli</th>
               <th className="px-5 py-4 text-right font-semibold">COD</th>
               <th className="px-5 py-4 text-right font-semibold">DFOD</th>
-              <th className="px-5 py-4 text-center font-semibold">Aksi</th>
+              {!readOnly && <th className="px-5 py-4 text-center font-semibold">Aksi</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -105,16 +107,18 @@ export default function InternalTable({
                 <td className="px-5 py-4 text-center text-slate-900">{item.jumlahKoli}</td>
                 <td className="px-5 py-4 text-right text-slate-900">{formatNumber(item.jumlahPembayaranCOD)}</td>
                 <td className="px-5 py-4 text-right text-slate-900">{formatNumber(item.biayaDFOD)}</td>
-                <td className="px-5 py-4 text-center">
-                  <div className="inline-flex items-center gap-2">
-                    <button onClick={() => onEdit(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 transition hover:bg-sky-100">
-                      Edit
-                    </button>
-                    <button onClick={() => handleDelete(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 transition hover:bg-rose-100">
-                      Hapus
-                    </button>
-                  </div>
-                </td>
+                {!readOnly && (
+                  <td className="px-5 py-4 text-center">
+                    <div className="inline-flex items-center gap-2">
+                      <button onClick={() => onEdit(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 transition hover:bg-sky-100">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 transition hover:bg-rose-100">
+                        Hapus
+                      </button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

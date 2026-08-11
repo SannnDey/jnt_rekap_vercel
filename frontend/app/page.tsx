@@ -1,7 +1,11 @@
 ﻿'use client';
 
 import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ToastProvider';
 import Header from '@/components/Header';
+import { authService } from '@/lib/auth';
 
 const modules = [
    {
@@ -29,6 +33,12 @@ const modules = [
     accent: 'from-cyan-500 to-sky-500',
   },
   {
+    title: 'Rekapan Gaji',
+    description: 'Hitung gaji Admin dan Driver berdasarkan kehadiran, bonus, dan kasbon.',
+    href: '/rekapan-gaji',
+    accent: 'from-emerald-500 to-lime-500',
+  },
+  {
     title: 'Rekapan Kasbon',
     description: 'Pantau kasbon per karyawan dan riwayat transaksi.',
     href: '/rekapan-kasbon',
@@ -37,6 +47,22 @@ const modules = [
 ];
 
 export default function HomePage() {
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
+
+  const router = useRouter();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setCurrentUser(authService.getCurrentUser());
+  }, []);
+
+  const visibleModules = useMemo(() => {
+    if (currentUser?.role === 'driver') {
+      return modules.filter((module) => ['\/rekapan-internal-harian', '\/rekapan-schedule'].includes(module.href));
+    }
+    return modules;
+  }, [currentUser]);
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <Header
@@ -44,9 +70,30 @@ export default function HomePage() {
         subtitle="Sistem Rekap J&T Cargo BDG015A"
         description="Pusat kontrol untuk mengelola semua rekap J&T Cargo."
         right={
-          <div className="space-y-2 text-sm leading-6 text-slate-200">
-            <p className="font-semibold uppercase tracking-[0.3em] text-sky-300">Navigasi Cepat</p>
-            <p>Semua modul penting berada dalam satu halaman yang rapi.</p>
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:block">
+              <div className="space-y-2 text-sm leading-6 text-slate-200">
+                <p className="font-semibold uppercase tracking-[0.3em] text-sky-300">Navigasi Cepat</p>
+                <p>Semua modul penting berada dalam satu halaman yang rapi.</p>
+              </div>
+            </div>
+            {currentUser && (
+              <div className="flex items-center gap-3">
+                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.24em] text-slate-300">{currentUser.role === 'admin' ? 'Admin' : currentUser.role === 'developer' ? 'Developer' : 'Driver'}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    authService.logout();
+                    setCurrentUser(null);
+                    toast('Anda telah keluar.', 'success');
+                    router.push('/login');
+                  }}
+                  className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         }
       />
@@ -81,9 +128,16 @@ export default function HomePage() {
             </div>
 
             <div className="rounded-[2rem] border border-white/10 bg-slate-950/80 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">Sorotan Modul</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">Sorotan Modul</p>
+                {currentUser && (
+                  <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.24em] text-slate-300">
+                    {currentUser.role === 'admin' ? 'Admin' : 'Driver'}
+                  </span>
+                )}
+              </div>
               <div className="mt-6 space-y-4">
-                {modules.map((module) => (
+                {visibleModules.map((module) => (
                   <Link
                     key={module.href}
                     href={module.href}

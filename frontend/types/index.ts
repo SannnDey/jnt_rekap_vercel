@@ -202,3 +202,35 @@ export interface ScheduleAttendanceApi {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface PayrollRate {
+  id: string;
+  month: string;
+  adminBase: number;
+  driverBase: number;
+  makan: number;
+  awb: number;
+  gw: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PayrollHistory {
+  id: string;
+  month: string;
+  employeeId: string;
+  employeeName: string;
+  role: 'Admin' | 'Driver';
+  hadirCount: number;
+  basePay: number;
+  makanPay: number;
+  bonusManual: number;
+  awbBonus: number;
+  gwBonus: number;
+  bonusTotal: number;
+  kasbonAmount: number;
+  grossPay: number;
+  netPay: number;
+  createdAt: string;
+  updatedAt: string;
+}

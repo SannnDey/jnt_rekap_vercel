@@ -27,6 +27,8 @@ export const buildDateRangeFilter = (
   }
   if (endDate) {
     range.lte = /^\d{4}-\d{2}-\d{2}$/.test(endDate)
+      ? parseDateString(endDate, true)
+      : new Date(endDate);
   }
 
   return { [fieldName]: range };

@@ -25,21 +25,16 @@ const baseScheduleAttendanceSchema = z.object({
 });
 
 const validateScheduleAttendancePartner = (data: { attendanceStatus?: string; partnerId?: string }, ctx: z.RefinementCtx) => {
-  if (data.attendanceStatus === 'GW Setengah' && !data.partnerId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Partner driver harus dipilih untuk status GW Setengah',
-      path: ['partnerId'],
-    });
-  }
+  const allowedWithPartner = ['Hadir', 'GW Setengah', 'Full GW + Deliv', 'Full GW No Deliv'];
 
-  if (data.attendanceStatus && data.attendanceStatus !== 'GW Setengah' && data.partnerId) {
+  if (data.attendanceStatus && !allowedWithPartner.includes(data.attendanceStatus) && data.partnerId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Partner hanya boleh dipilih untuk status GW Setengah',
+      message: 'Partner hanya boleh dipilih untuk status Hadir, GW Setengah, Full GW + Deliv, atau Full GW No Deliv',
       path: ['partnerId'],
     });
   }
+  // partner is optional for allowed statuses; no requirement enforced here
 };
 
 export const CreateScheduleAttendanceSchema = baseScheduleAttendanceSchema.superRefine(validateScheduleAttendancePartner);

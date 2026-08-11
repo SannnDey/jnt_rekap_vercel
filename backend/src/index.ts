@@ -7,6 +7,7 @@ import rekapanInternalRoutes from './routes/rekapanInternal.routes';
 import kasbonRoutes from './routes/kasbon.routes';
 import pengeluaranRoutes from './routes/pengeluaran.routes';
 import scheduleRoutes from './routes/schedule.routes';
+import payrollRoutes from './routes/payroll.routes';
 
 dotenv.config();
 
@@ -71,6 +72,7 @@ app.use('/api/rekapan-internal', rekapanInternalRoutes);
 app.use('/api/kasbon', kasbonRoutes);
 app.use('/api/pengeluaran', pengeluaranRoutes);
 app.use('/api/schedule', scheduleRoutes);
+app.use('/api/payroll', payrollRoutes);
 
 // ========== Error Handlers ==========
 

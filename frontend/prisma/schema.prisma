@@ -56,6 +56,72 @@ model ActivityLog {
   @@map("activity_log")
 }
 
+model UserAccount {
+  id        String   @id @default(uuid()) @db.Char(36)
+  name      String   @db.VarChar(150)
+  email     String   @unique @db.VarChar(255)
+  password  String   @db.VarChar(255)
+  role      UserRole @default(DRIVER)
+  status    UserStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@map("user_account")
+}
+
+enum UserRole {
+  ADMIN
+  DRIVER 
+  DEVELOPER
+}
+
+enum UserStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+model PayrollRate {
+  id         String   @id @default(uuid()) @db.Char(36)
+  month      String   @db.VarChar(7)
+  adminBase  Int
+  driverBase Int
+  makan      Int
+  awb        Int
+  gw         Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([month])
+  @@map("payroll_rate")
+}
+
+model PayrollHistory {
+  id           String   @id @default(uuid()) @db.Char(36)
+  month        String   @db.VarChar(7)
+  employeeId   String   @db.Char(36)
+  employeeName String   @db.VarChar(150)
+  role         String   @db.VarChar(20)
+  hadirCount   Int
+  basePay      Int
+  makanPay     Int
+  bonusManual  Int
+  awbBonus     Int
+  gwBonus      Int
+  bonusTotal   Int
+  kasbonAmount Int
+  grossPay     Int
+  netPay       Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([month, employeeId])
+  @@map("payroll_history")
+}
+
 enum MetodePembayaran {
   TRANSFER
   CASH

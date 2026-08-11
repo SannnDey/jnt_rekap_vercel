@@ -68,27 +68,50 @@ const baseScheduleAttendanceSchema = z.object({
 });
 
 const validateScheduleAttendancePartner = (data: { attendanceStatus?: string; partnerId?: string }, ctx: z.RefinementCtx) => {
-  if (data.attendanceStatus === 'GW Setengah' && !data.partnerId) {
+  const allowedWithPartner = ['Hadir', 'GW Setengah', 'Full GW + Deliv', 'Full GW No Deliv'];
+  if (data.attendanceStatus && !allowedWithPartner.includes(data.attendanceStatus) && data.partnerId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Partner driver harus dipilih untuk status GW Setengah',
+      message: 'Partner hanya boleh dipilih untuk status Hadir, GW Setengah, Full GW + Deliv, atau Full GW No Deliv',
       path: ['partnerId'],
     });
   }
-
-  if (data.attendanceStatus && data.attendanceStatus !== 'GW Setengah' && data.partnerId) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Partner hanya boleh dipilih untuk status GW Setengah',
-      path: ['partnerId'],
-    });
-  }
+  // partner is optional for allowed statuses
 };
 
 export const CreateScheduleAttendanceSchema = baseScheduleAttendanceSchema.superRefine(validateScheduleAttendancePartner);
 export const UpdateScheduleAttendanceSchema = baseScheduleAttendanceSchema.partial().superRefine(validateScheduleAttendancePartner);
 export const EmployeeIdSchema = z.object({ id: z.string().uuid('Employee ID harus UUID valid') });
 export const ScheduleAttendanceIdSchema = z.object({ id: z.string().uuid('Attendance ID harus UUID valid') });
+
+export const PayrollRateSchema = z.object({
+  adminBase: z.coerce.number().int().min(0, 'Gaji pokok admin tidak boleh negatif'),
+  driverBase: z.coerce.number().int().min(0, 'Gaji pokok driver tidak boleh negatif'),
+  makan: z.coerce.number().int().min(0, 'Uang makan tidak boleh negatif'),
+  awb: z.coerce.number().int().min(0, 'Bonus AWB tidak boleh negatif'),
+  gw: z.coerce.number().int().min(0, 'Bonus GW tidak boleh negatif'),
+});
+
+export const PayrollHistoryRowSchema = z.object({
+  employeeId: z.string().uuid('Employee ID harus UUID valid'),
+  employeeName: z.string().trim().min(1, 'Nama karyawan harus diisi'),
+  role: z.enum(['Admin', 'Driver']),
+  hadirCount: z.coerce.number().int().min(0, 'Hadir count tidak boleh negatif'),
+  basePay: z.coerce.number().int().min(0, 'Gaji pokok tidak boleh negatif'),
+  makanPay: z.coerce.number().int().min(0, 'Uang makan tidak boleh negatif'),
+  bonusManual: z.coerce.number().int().min(0, 'Bonus manual tidak boleh negatif'),
+  awbBonus: z.coerce.number().int().min(0, 'Bonus AWB tidak boleh negatif'),
+  gwBonus: z.coerce.number().int().min(0, 'Bonus GW tidak boleh negatif'),
+  bonusTotal: z.coerce.number().int().min(0, 'Total bonus tidak boleh negatif'),
+  kasbonAmount: z.coerce.number().int().min(0, 'Kasbon tidak boleh negatif'),
+  grossPay: z.coerce.number().int().min(0, 'Gaji kotor tidak boleh negatif'),
+  netPay: z.coerce.number().int(),
+});
+
+export const SavePayrollHistorySchema = z.object({
+  month: z.string().min(1, 'Bulan harus diisi'),
+  rows: z.array(PayrollHistoryRowSchema),
+});
 
 export const CreateKasbonSchema = z.object({
   employee: z.string().min(1, 'Employee harus diisi'),

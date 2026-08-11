@@ -30,6 +30,8 @@ export async function GET(request: NextRequest) {
       success: true,
       message: 'Summary rekapan internal berhasil diambil',
       data: {
+        totalAwb: total._count._all || 0,
+        // keep totalCount for backward compatibility
         totalCount: total._count._all || 0,
         totalKoli: total._sum.jumlahKoli || 0,
         totalCOD: total._sum.jumlahPembayaranCOD || 0,

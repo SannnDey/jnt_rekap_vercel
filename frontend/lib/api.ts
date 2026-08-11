@@ -11,6 +11,8 @@ import {
   Employee,
   ScheduleAttendanceApi,
   ScheduleEmployee,
+  PayrollRate,
+  PayrollHistory,
 } from '@/types';
 import {
   RekapanInternalRecord,
@@ -21,6 +23,24 @@ import {
 
 class ApiClient {
   private client: AxiosInstance;
+
+  private getErrorMessage(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      const payload = error.response?.data as any;
+      if (typeof payload === 'string') return payload;
+      return payload?.message || payload?.error || payload?.details || error.message || 'Permintaan gagal';
+    }
+
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return 'Permintaan gagal';
+  }
+
+  private throwApiError(error: unknown): never {
+    throw new Error(this.getErrorMessage(error));
+  }
 
   constructor() {
     this.client = axios.create({
@@ -257,6 +277,34 @@ class ApiClient {
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
     const response = await this.client.get('/kasbon/summary', { params });
+    return response.data;
+  }
+
+  async getPayrollRate(month?: string): Promise<ApiResponse<PayrollRate | null>> {
+    const params: any = {};
+    if (month) params.month = month;
+    const response = await this.client.get('/payroll', { params });
+    return response.data;
+  }
+
+  async updatePayrollRate(month: string, data: { adminBase: number; driverBase: number; makan: number; awb: number; gw: number; }): Promise<ApiResponse<PayrollRate>> {
+    try {
+      const response = await this.client.put(`/payroll/${month}`, data);
+      return response.data;
+    } catch (error) {
+      this.throwApiError(error);
+    }
+  }
+
+  async getPayrollHistory(month?: string): Promise<ApiResponse<PayrollHistory[]>> {
+    const params: any = {};
+    if (month) params.month = month;
+    const response = await this.client.get('/payroll/history', { params });
+    return response.data;
+  }
+
+  async savePayrollHistory(month: string, rows: Omit<PayrollHistory, 'id' | 'createdAt' | 'updatedAt' | 'month'>[]): Promise<ApiResponse<undefined>> {
+    const response = await this.client.post('/payroll/history', { month, rows });
     return response.data;
   }
 

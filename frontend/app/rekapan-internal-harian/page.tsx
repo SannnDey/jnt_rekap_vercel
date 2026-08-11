@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import Header from '@/components/Header';
@@ -10,6 +11,7 @@ import { useInternalSummary } from '@/hooks/useInternal';
 import { apiClient } from '@/lib/api';
 import { formatNumber, formatDate, getFriendlyErrorMessage } from '@/lib/utils';
 import { useToast } from '@/components/ToastProvider';
+import { authService } from '@/lib/auth';
 import type { CreateRekapanInternalInput, RekapanInternalRecord } from '../../types/internal';
 
 export default function RekapanInternalHarianPage() {
@@ -39,6 +41,20 @@ export default function RekapanInternalHarianPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
+
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+    if (user.role !== 'admin' && user.role !== 'driver') {
+      router.replace('/');
+    }
+  }, [router]);
 
   const summaryResponse = useInternalSummary(startDate || undefined, endDate || undefined);
   const summaryData = summaryResponse.data?.data;
@@ -551,10 +567,17 @@ export default function RekapanInternalHarianPage() {
               <p className="mt-2 text-sm text-slate-500">Tambah, ubah, dan lihat data rekapan internal dengan cepat.</p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button onClick={() => { setEditingId(null); setShowForm(true); }} className="inline-flex h-12 items-center justify-center rounded-full bg-sky-600 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">+ Tambah Rekapan</button>
-              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleImportFile} className="hidden" />
-              <button onClick={() => fileInputRef.current?.click()} disabled={importLoading} className="inline-flex h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60">{importLoading ? 'Memuat...' : 'Import Excel'}</button>
-              <button onClick={() => setShowExportModal(true)} className="inline-flex h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">Export</button>
+              {currentUser?.role === 'admin' && (
+                <>
+                  <button onClick={() => { setEditingId(null); setShowForm(true); }} className="inline-flex h-12 items-center justify-center rounded-full bg-sky-600 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">+ Tambah Rekapan</button>
+                  <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleImportFile} className="hidden" />
+                  <button onClick={() => fileInputRef.current?.click()} disabled={importLoading} className="inline-flex h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60">{importLoading ? 'Memuat...' : 'Import Excel'}</button>
+                  <button onClick={() => setShowExportModal(true)} className="inline-flex h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">Export</button>
+                </>
+              )}
+              {currentUser?.role === 'driver' && (
+                <div className="rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-700">Mode View Only</div>
+              )}
             </div>
           </div>
 
@@ -648,6 +671,7 @@ export default function RekapanInternalHarianPage() {
               onPageChange={setCurrentPage}
               onEdit={handleEdit}
               onDataChange={handleDataChange}
+              readOnly={currentUser?.role === 'driver'}
             />
           </div>
         </div>

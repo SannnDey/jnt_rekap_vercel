@@ -67,6 +67,44 @@ model ActivityLog {
   @@map("activity_log")
 }
 
+model PayrollRate {
+  id        String   @id @default(uuid()) @db.Char(36)
+  month     String   @db.VarChar(7)
+  adminBase Int
+  driverBase Int
+  makan     Int
+  awb       Int
+  gw        Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([month])
+  @@map("payroll_rate")
+}
+
+model PayrollHistory {
+  id           String   @id @default(uuid()) @db.Char(36)
+  month        String   @db.VarChar(7)
+  employeeId   String   @db.Char(36)
+  employeeName String   @db.VarChar(150)
+  role         String   @db.VarChar(10)
+  hadirCount   Int
+  basePay      Int
+  makanPay     Int
+  bonusManual  Int
+  awbBonus     Int
+  gwBonus      Int
+  bonusTotal   Int
+  kasbonAmount Int
+  grossPay     Int
+  netPay       Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([month])
+  @@map("payroll_history")
+}
+
 enum MetodePembayaran {
   TRANSFER
   CASH

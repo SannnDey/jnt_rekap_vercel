@@ -392,6 +392,7 @@ export default function RekapanForm({ editingId, onClose, onDataChange }: Rekapa
               <option value={MetodePembayaran.TF_CASH}>TF + Cash</option>
               <option value={MetodePembayaran.PICKUP_ONLINE}>Pickup Online</option>
               <option value={MetodePembayaran.BULANAN}>Bulanan</option>
+              <option value={MetodePembayaran.DFOD}>DFOD</option>
             </select>
             {errors['metodePembayaran'] ? (
               <div className="mt-1 text-xs text-red-600">{errors['metodePembayaran']} wajib diisi.</div>

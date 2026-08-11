@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { useToast } from '@/components/ToastProvider';
 import {
@@ -20,6 +21,7 @@ import {
   useScheduleEmployees,
   useUpdateScheduleAttendance,
 } from '@/hooks/useSchedule';
+import { authService } from '@/lib/auth';
 
 const adminStatuses: AttendanceStatus[] = ['Hadir', 'Sakit', 'Izin', 'Alpha'];
 const driverStatuses: DriverAttendanceStatus[] = [
@@ -33,6 +35,13 @@ const driverStatuses: DriverAttendanceStatus[] = [
 ];
 
 const driverPresenceStatuses: DriverAttendanceStatus[] = [
+  'Hadir',
+  'Full GW + Deliv',
+  'Full GW No Deliv',
+  'GW Setengah',
+];
+
+const partnerAllowedStatuses: DriverAttendanceStatus[] = [
   'Hadir',
   'Full GW + Deliv',
   'Full GW No Deliv',
@@ -72,6 +81,8 @@ const isAttendancePresent = (record: AttendanceRecord) =>
 
 export default function RekapanSchedulePage() {
   const { toast } = useToast();
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
   const [tanggal, setTanggal] = useState(() => new Date().toISOString().slice(0, 10));
   const [employeeId, setEmployeeId] = useState('');
   const [kehadiran, setKehadiran] = useState<DriverAttendanceStatus>('Hadir');
@@ -104,6 +115,18 @@ export default function RekapanSchedulePage() {
   const updateAttendance = useUpdateScheduleAttendance();
   const deleteAttendance = useDeleteScheduleAttendance();
   const createEmployee = useCreateScheduleEmployee();
+
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+    if (!['admin', 'driver'].includes(user.role)) {
+      router.replace('/');
+    }
+  }, [router]);
 
   useEffect(() => {
     if (!employeeId && employees.length > 0) {
@@ -142,11 +165,23 @@ export default function RekapanSchedulePage() {
 
   const adminRecords = attendanceRecords.filter((record) => record.role === 'Admin');
   const driverRecords = attendanceRecords.filter((record) => record.role === 'Driver');
+  const groupByDate = (records: AttendanceRecord[]) => {
+    const map = new Map<string, AttendanceRecord[]>();
+    for (const r of records) {
+      const key = r.tanggal;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  };
+  const groupedAdmin = groupByDate(adminRecords);
+  const groupedDriver = groupByDate(driverRecords);
   const driverPresentCount = useMemo(
     () => driverRecords.filter((record) => isDriverPresentStatus(record.kehadiran)).length,
     [driverRecords]
   );
   const totalRecords = attendanceRecords.length;
+  const canExportData = currentUser?.role === 'admin';
 
   const handleEmployeeChange = (value: string) => {
     const nextEmployee = employees.find((item) => item.id === value);
@@ -163,7 +198,6 @@ export default function RekapanSchedulePage() {
 
   const canSaveRecord = (): boolean => {
     if (!tanggal || !selectedEmployee) return false;
-    if (kehadiran === 'GW Setengah' && !partnerId) return false;
     return true;
   };
 
@@ -255,7 +289,7 @@ export default function RekapanSchedulePage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSaveRecord() || !selectedEmployee) {
-      toast('Lengkapi data karyawan dan pilih partner driver saat GW Setengah.', 'error');
+      toast('Lengkapi data karyawan.', 'error');
       return;
     }
 
@@ -265,7 +299,7 @@ export default function RekapanSchedulePage() {
         employeeId: selectedEmployee.id,
         attendanceStatus: kehadiran,
         keterangan: keterangan.trim() || undefined,
-        partnerId: kehadiran === 'GW Setengah' ? partnerId : undefined,
+        partnerId: partnerAllowedStatuses.includes(kehadiran) ? partnerId || undefined : undefined,
       },
       {
         onSuccess: () => {
@@ -285,7 +319,10 @@ export default function RekapanSchedulePage() {
       employeeId: record.employeeId,
       attendanceStatus: inlineEditValues.attendanceStatus,
       keterangan: inlineEditValues.keterangan.trim() || undefined,
-      partnerId: record.role === 'Driver' && inlineEditValues.attendanceStatus === 'GW Setengah' ? inlineEditValues.partnerId || undefined : undefined,
+      partnerId:
+        record.role === 'Driver' && partnerAllowedStatuses.includes(inlineEditValues.attendanceStatus)
+          ? inlineEditValues.partnerId || undefined
+          : undefined,
     };
 
     updateAttendance.mutate(
@@ -303,6 +340,11 @@ export default function RekapanSchedulePage() {
   };
 
   const downloadExcel = async (rows: AttendanceRecord[] = attendanceRecords, label = exportPeriodLabel) => {
+    if (currentUser?.role !== 'admin') {
+      toast('Akses export hanya tersedia untuk admin.', 'error');
+      return;
+    }
+
     if (rows.length === 0) {
       toast('Tidak ada data kehadiran untuk diekspor.', 'error');
       return;
@@ -514,6 +556,11 @@ export default function RekapanSchedulePage() {
             <Link href="/" className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
               Beranda
             </Link>
+            {currentUser?.role === 'admin' && (
+              <Link href="/manage-users" className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Manage User
+              </Link>
+            )}
           </div>
         }
       />
@@ -705,42 +752,44 @@ export default function RekapanSchedulePage() {
         <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-8 shadow-2xl shadow-slate-200/40 backdrop-blur-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-semibold text-slate-900">Form Tambah Karyawan</h2>
+              <h2 className="text-2xl font-semibold text-slate-900">{currentUser?.role === 'admin' ? 'Form Tambah Karyawan' : 'Form Rekap Kehadiran'}</h2>
               <p className="mt-2 text-sm text-slate-600">Tambahkan karyawan baru sebelum mengisi rekap kehadiran.</p>
             </div>
           </div>
 
-          <form className="mt-6 space-y-5" onSubmit={handleCreateEmployee}>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700">Nama Karyawan</label>
-              <input
-                type="text"
-                value={newEmployeeName}
-                onChange={(event) => setNewEmployeeName(event.target.value)}
-                placeholder="Contoh: Budi"
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500"
-              />
-            </div>
+          {currentUser?.role === 'admin' ? (
+            <form className="mt-6 space-y-5" onSubmit={handleCreateEmployee}>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700">Nama Karyawan</label>
+                <input
+                  type="text"
+                  value={newEmployeeName}
+                  onChange={(event) => setNewEmployeeName(event.target.value)}
+                  placeholder="Contoh: Budi"
+                  className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500"
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700">Jabatan</label>
-              <select
-                value={newEmployeeRole}
-                onChange={(event) => setNewEmployeeRole(event.target.value as 'Admin' | 'Driver')}
-                className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500"
+              <div>
+                <label className="block text-sm font-semibold text-slate-700">Jabatan</label>
+                <select
+                  value={newEmployeeRole}
+                  onChange={(event) => setNewEmployeeRole(event.target.value as 'Admin' | 'Driver')}
+                  className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500"
+                >
+                  <option value="Admin">Admin</option>
+                  <option value="Driver">Driver</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                <option value="Admin">Admin</option>
-                <option value="Driver">Driver</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              {createEmployee.isPending ? 'Menyimpan...' : 'Tambah Karyawan'}
-            </button>
-          </form>
+                {createEmployee.isPending ? 'Menyimpan...' : 'Tambah Karyawan'}
+              </button>
+            </form>
+          ) : null}
         </section>
 
         <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-8 shadow-2xl shadow-slate-200/40 backdrop-blur-sm">
@@ -749,19 +798,21 @@ export default function RekapanSchedulePage() {
               <h2 className="text-2xl font-semibold text-slate-900">Form Input Kehadiran</h2>
               <p className="mt-2 text-sm text-slate-600">Isi data kehadiran, lalu klik simpan untuk menambahkan ke tabel rekap.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setExportSelectedMonth((current) => current || new Date().toISOString().slice(0, 7));
-                setExportPreviewRows([]);
-                setExportPeriodLabel('');
-                setExportPreviewOpen(true);
-              }}
-              disabled={exportLoading}
-              className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-            >
-              {exportLoading ? 'Mempersiapkan...' : 'Export ke Excel'}
-            </button>
+            {canExportData ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setExportSelectedMonth((current) => current || new Date().toISOString().slice(0, 7));
+                  setExportPreviewRows([]);
+                  setExportPeriodLabel('');
+                  setExportPreviewOpen(true);
+                }}
+                disabled={exportLoading}
+                className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {exportLoading ? 'Mempersiapkan...' : 'Export ke Excel'}
+              </button>
+            ) : null}
           </div>
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -806,7 +857,7 @@ export default function RekapanSchedulePage() {
                 </select>
               </div>
 
-              {selectedEmployee?.role === 'Driver' && kehadiran === 'GW Setengah' && (
+              {selectedEmployee?.role === 'Driver' && partnerAllowedStatuses.includes(kehadiran) && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700">Setengah Bersama</label>
                   <select
@@ -822,7 +873,7 @@ export default function RekapanSchedulePage() {
                     ))}
                   </select>
                   {driverPartners.length === 0 && (
-                    <p className="mt-2 text-sm text-rose-600">Belum ada driver lain yang tersedia untuk GW Setengah.</p>
+                    <p className="mt-2 text-sm text-rose-600">Belum ada driver lain yang tersedia.</p>
                   )}
                 </div>
               )}
@@ -847,7 +898,7 @@ export default function RekapanSchedulePage() {
                     <li>Masukkan tanggal dan pilih karyawan yang tersedia.</li>
                     <li>Admin: hadir, sakit, izin, alpha.</li>
                     <li>Driver: hadir, sakit, izin, alpha, full GW + deliv, full GW no deliv, GW setengah.</li>
-                    <li>Untuk GW Setengah, pilih partner driver yang ikut setengah tugas.</li>
+                    <li>Untuk GW Setengah dan status Full GW, pilih partner driver jika diperlukan.</li>
                   </ul>
                 </div>
                 <button
@@ -891,97 +942,108 @@ export default function RekapanSchedulePage() {
                     <th className="px-6 py-4 font-semibold">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {adminRecords.map((record, index) => (
-                    <tr key={record.id} className={index % 2 === 0 ? 'bg-slate-50' : ''}>
-                      <td className="px-6 py-4 font-medium text-slate-900">{index + 1}</td>
-                      {inlineEditingId === record.id ? (
-                        <>
-                          <td className="px-6 py-4">
-                            <input
-                              type="date"
-                              value={inlineEditValues.tanggal}
-                              onChange={(event) => setInlineEditValues((current) => ({ ...current, tanggal: event.target.value }))}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                            />
-                          </td>
-                          <td className="px-6 py-4">{record.employeeName}</td>
-                          <td className="px-6 py-4">
-                            <select
-                              value={inlineEditValues.attendanceStatus}
-                              onChange={(event) => setInlineEditValues((current) => ({ ...current, attendanceStatus: event.target.value as DriverAttendanceStatus }))}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                            >
-                              {adminStatuses.map((status) => (
-                                <option key={status} value={status}>{status}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-6 py-4">
-                            <textarea
-                              rows={2}
-                              value={inlineEditValues.keterangan}
-                              onChange={(event) => setInlineEditValues((current) => ({ ...current, keterangan: event.target.value }))}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                            />
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleInlineSave(record)}
-                                className="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
-                              >
-                                Simpan
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleCancelInlineEdit}
-                                className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                              >
-                                Batal
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-6 py-4">{record.tanggal}</td>
-                          <td className="px-6 py-4">{record.employeeName}</td>
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyle[record.kehadiran]}`}>{record.kehadiran}</span>
-                          </td>
-                          <td className="px-6 py-4">{record.keterangan || '-'}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleEditAttendance(record)}
-                                className="rounded-full border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-50"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteAttendance(record.id)}
-                                className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                  {adminRecords.length === 0 && (
+                {groupedAdmin.length === 0 ? (
+                  <tbody className="divide-y divide-slate-200 bg-white">
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-500">
-                        Belum ada data Admin.
-                      </td>
+                      <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-500">Belum ada data Admin.</td>
                     </tr>
-                  )}
-                </tbody>
+                  </tbody>
+                ) : (
+                  groupedAdmin.map(([date, rows]) => (
+                    <tbody key={date} className="divide-y divide-slate-200 bg-white">
+                      <tr className="bg-slate-100">
+                        <td colSpan={6} className="px-6 py-2 font-semibold text-slate-700">{date}</td>
+                      </tr>
+                      {rows.map((record) => {
+                        const idx = adminRecords.findIndex((r) => r.id === record.id);
+                        return (
+                          <tr key={record.id} className={idx % 2 === 0 ? 'bg-slate-50' : ''}>
+                            <td className="px-6 py-4 font-medium text-slate-900">{idx + 1}</td>
+                            {inlineEditingId === record.id ? (
+                              <>
+                                <td className="px-6 py-4">
+                                  <input
+                                    type="date"
+                                    value={inlineEditValues.tanggal}
+                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, tanggal: event.target.value }))}
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                  />
+                                </td>
+                                <td className="px-6 py-4">{record.employeeName}</td>
+                                <td className="px-6 py-4">
+                                  <select
+                                    value={inlineEditValues.attendanceStatus}
+                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, attendanceStatus: event.target.value as DriverAttendanceStatus }))}
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                  >
+                                    {adminStatuses.map((status) => (
+                                      <option key={status} value={status}>{status}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <textarea
+                                    rows={2}
+                                    value={inlineEditValues.keterangan}
+                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, keterangan: event.target.value }))}
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                  />
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleInlineSave(record)}
+                                      className="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                                    >
+                                      Simpan
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleCancelInlineEdit}
+                                      className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                                    >
+                                      Batal
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-6 py-4">{record.tanggal}</td>
+                                <td className="px-6 py-4">{record.employeeName}</td>
+                                <td className="px-6 py-4">
+                                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyle[record.kehadiran]}`}>{record.kehadiran}</span>
+                                </td>
+                                <td className="px-6 py-4">{record.keterangan || '-'}</td>
+                                <td className="px-6 py-4">
+                                  {currentUser?.role === 'admin' ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEditAttendance(record)}
+                                        className="rounded-full border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-50"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteAttendance(record.id)}
+                                        className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  ))
+                )}
               </table>
             </div>
 
@@ -1001,110 +1063,121 @@ export default function RekapanSchedulePage() {
                     <th className="px-6 py-4 font-semibold">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {driverRecords.map((record, index) => (
-                    <tr key={record.id} className={index % 2 === 0 ? 'bg-slate-50' : ''}>
-                      <td className="px-6 py-4 font-medium text-slate-900">{index + 1}</td>
-                      {inlineEditingId === record.id ? (
-                        <>
-                          <td className="px-6 py-4">
-                            <input
-                              type="date"
-                              value={inlineEditValues.tanggal}
-                              onChange={(event) => setInlineEditValues((current) => ({ ...current, tanggal: event.target.value }))}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                            />
-                          </td>
-                          <td className="px-6 py-4">{record.employeeName}</td>
-                          <td className="px-6 py-4">
-                            <select
-                              value={inlineEditValues.attendanceStatus}
-                              onChange={(event) => setInlineEditValues((current) => ({ ...current, attendanceStatus: event.target.value as DriverAttendanceStatus }))}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                            >
-                              {driverStatuses.map((status) => (
-                                <option key={status} value={status}>{status}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-6 py-4">
-                            <select
-                              value={inlineEditValues.partnerId}
-                              onChange={(event) => setInlineEditValues((current) => ({ ...current, partnerId: event.target.value }))}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                            >
-                              <option value="">Pilih partner</option>
-                              {employees.filter((employee) => employee.role === 'Driver' && employee.id !== record.employeeId).map((employee) => (
-                                <option key={employee.id} value={employee.id}>{employee.name}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-6 py-4">
-                            <textarea
-                              rows={2}
-                              value={inlineEditValues.keterangan}
-                              onChange={(event) => setInlineEditValues((current) => ({ ...current, keterangan: event.target.value }))}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                            />
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleInlineSave(record)}
-                                className="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
-                              >
-                                Simpan
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleCancelInlineEdit}
-                                className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                              >
-                                Batal
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-6 py-4">{record.tanggal}</td>
-                          <td className="px-6 py-4">{record.employeeName}</td>
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyle[record.kehadiran]}`}>{record.kehadiran}</span>
-                          </td>
-                          <td className="px-6 py-4">{record.partnerName || '-'}</td>
-                          <td className="px-6 py-4">{record.keterangan || '-'}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleEditAttendance(record)}
-                                className="rounded-full border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-50"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteAttendance(record.id)}
-                                className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                  {driverRecords.length === 0 && (
+                {groupedDriver.length === 0 ? (
+                  <tbody className="divide-y divide-slate-200 bg-white">
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">
-                        Belum ada data Driver.
-                      </td>
+                      <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">Belum ada data Driver.</td>
                     </tr>
-                  )}
-                </tbody>
+                  </tbody>
+                ) : (
+                  groupedDriver.map(([date, rows]) => (
+                    <tbody key={date} className="divide-y divide-slate-200 bg-white">
+                      <tr className="bg-slate-100">
+                        <td colSpan={7} className="px-6 py-2 font-semibold text-slate-700">{date}</td>
+                      </tr>
+                      {rows.map((record) => {
+                        const idx = driverRecords.findIndex((r) => r.id === record.id);
+                        return (
+                          <tr key={record.id} className={idx % 2 === 0 ? 'bg-slate-50' : ''}>
+                            <td className="px-6 py-4 font-medium text-slate-900">{idx + 1}</td>
+                            {inlineEditingId === record.id ? (
+                              <>
+                                <td className="px-6 py-4">
+                                  <input
+                                    type="date"
+                                    value={inlineEditValues.tanggal}
+                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, tanggal: event.target.value }))}
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                  />
+                                </td>
+                                <td className="px-6 py-4">{record.employeeName}</td>
+                                <td className="px-6 py-4">
+                                  <select
+                                    value={inlineEditValues.attendanceStatus}
+                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, attendanceStatus: event.target.value as DriverAttendanceStatus }))}
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                  >
+                                    {driverStatuses.map((status) => (
+                                      <option key={status} value={status}>{status}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <select
+                                    value={inlineEditValues.partnerId}
+                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, partnerId: event.target.value }))}
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                  >
+                                    <option value="">Pilih partner</option>
+                                    {employees.filter((employee) => employee.role === 'Driver' && employee.id !== record.employeeId).map((employee) => (
+                                      <option key={employee.id} value={employee.id}>{employee.name}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <textarea
+                                    rows={2}
+                                    value={inlineEditValues.keterangan}
+                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, keterangan: event.target.value }))}
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                  />
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleInlineSave(record)}
+                                      className="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                                    >
+                                      Simpan
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleCancelInlineEdit}
+                                      className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                                    >
+                                      Batal
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-6 py-4">{record.tanggal}</td>
+                                <td className="px-6 py-4">{record.employeeName}</td>
+                                <td className="px-6 py-4">
+                                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyle[record.kehadiran]}`}>{record.kehadiran}</span>
+                                </td>
+                                <td className="px-6 py-4">{record.partnerName || '-'}</td>
+                                <td className="px-6 py-4">{record.keterangan || '-'}</td>
+                                <td className="px-6 py-4">
+                                  {currentUser?.role === 'admin' ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEditAttendance(record)}
+                                        className="rounded-full border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-50"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteAttendance(record.id)}
+                                        className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  ))
+                )}
               </table>
             </div>
           </div>

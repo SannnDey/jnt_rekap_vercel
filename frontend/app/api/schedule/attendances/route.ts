@@ -23,7 +23,22 @@ export async function GET(request: NextRequest) {
       include: { employee: true, partner: true },
     });
 
-    return jsonResponse({ success: true, message: 'Data kehadiran berhasil diambil', data: attendances, timestamp: new Date().toISOString() });
+    const attendanceStatusLabel: Record<string, string> = {
+      Hadir: 'Hadir',
+      Sakit: 'Sakit',
+      Izin: 'Izin',
+      Alpha: 'Alpha',
+      Full_GW_Deliv: 'Full GW + Deliv',
+      Full_GW_No_Deliv: 'Full GW No Deliv',
+      GW_Setengah: 'GW Setengah',
+    };
+
+    const normalize = (rec: any) => ({
+      ...rec,
+      attendanceStatus: attendanceStatusLabel[rec.attendanceStatus] ?? rec.attendanceStatus,
+    });
+
+    return jsonResponse({ success: true, message: 'Data kehadiran berhasil diambil', data: attendances.map(normalize), timestamp: new Date().toISOString() });
   } catch (error) {
     return errorResponse('Gagal mengambil data kehadiran', 500, String(error));
   }
@@ -40,17 +55,58 @@ export async function POST(request: NextRequest) {
     const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
     if (!employee) return errorResponse('Karyawan tidak ditemukan', 404);
 
+    // disallow Full statuses for Admin role (only drivers can have Full GW)
+    if (employee.role === 'Admin' && String(attendanceStatus).startsWith('Full')) {
+      return errorResponse('Status Full GW hanya berlaku untuk driver', 400);
+    }
+
+    if (partnerId) {
+      const partner = await prisma.employee.findUnique({ where: { id: partnerId } });
+      if (!partner || partner.role !== 'Driver') {
+        return errorResponse('Partner harus karyawan dengan jabatan Driver', 400);
+      }
+    }
+
+    const attendanceStatusMap: Record<string, string> = {
+      Hadir: 'Hadir',
+      Sakit: 'Sakit',
+      Izin: 'Izin',
+      Alpha: 'Alpha',
+      'Full GW + Deliv': 'Full_GW_Deliv',
+      'Full GW No Deliv': 'Full_GW_No_Deliv',
+      'GW Setengah': 'GW_Setengah',
+    };
+
+    const mapped = attendanceStatusMap[attendanceStatus];
+    if (!mapped) return errorResponse('Status kehadiran tidak valid', 400);
+
     const attendance = await prisma.scheduleAttendance.create({
       data: {
         tanggal: new Date(String(tanggal)),
         employeeId,
-        attendanceStatus: attendanceStatus as any,
+        attendanceStatus: mapped as any,
         keterangan: keterangan ?? null,
         partnerId: partnerId ?? null,
       },
     });
 
-    return jsonResponse({ success: true, message: 'Rekap kehadiran berhasil disimpan', data: attendance, timestamp: new Date().toISOString() }, 201);
+    // normalize for response
+    const attendanceStatusLabel: Record<string, string> = {
+      Hadir: 'Hadir',
+      Sakit: 'Sakit',
+      Izin: 'Izin',
+      Alpha: 'Alpha',
+      Full_GW_Deliv: 'Full GW + Deliv',
+      Full_GW_No_Deliv: 'Full GW No Deliv',
+      GW_Setengah: 'GW Setengah',
+    };
+
+    const normalize = (rec: any) => ({
+      ...rec,
+      attendanceStatus: attendanceStatusLabel[rec.attendanceStatus] ?? rec.attendanceStatus,
+    });
+
+    return jsonResponse({ success: true, message: 'Rekap kehadiran berhasil disimpan', data: normalize(attendance), timestamp: new Date().toISOString() }, 201);
   } catch (error) {
     return errorResponse('Gagal menyimpan kehadiran', 400, String(error));
   }

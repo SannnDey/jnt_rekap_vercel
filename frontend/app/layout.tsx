@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './globals.css';
 import { ToastProvider } from '@/components/ToastProvider';
 import { ConfirmProvider } from '@/components/ConfirmProvider';
+import AuthGate from '@/components/AuthGate';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,7 +32,9 @@ export default function RootLayout({
       <body>
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
-            <ConfirmProvider>{children}</ConfirmProvider>
+            <ConfirmProvider>
+              <AuthGate>{children}</AuthGate>
+            </ConfirmProvider>
           </ToastProvider>
         </QueryClientProvider>
       </body>
