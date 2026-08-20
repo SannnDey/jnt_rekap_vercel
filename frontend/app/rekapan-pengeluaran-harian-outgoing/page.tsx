@@ -110,10 +110,12 @@ export default function RekapanPengeluaranPage() {
 
       if (editingId) {
         await updateMutation.mutateAsync({ id: editingId, data: payload });
-        toast('Pengeluaran diperbarui', 'success');
+        const itemLabel = `💰 ${payload.jenis} — ${formatCurrency(Number(payload.nominal))}`;
+        toast(`✏️ ${itemLabel}`, 'success');
       } else {
         await createMutation.mutateAsync(payload);
-        toast('Pengeluaran dibuat', 'success');
+        const itemLabel = `💰 ${payload.jenis} — ${formatCurrency(Number(payload.nominal))}`;
+        toast(`✅ ${itemLabel}`, 'success');
       }
       resetForm();
       setShowForm(false);
@@ -163,11 +165,12 @@ export default function RekapanPengeluaranPage() {
       }
     : null;
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (item: any) => {
     if (!confirm('Hapus pengeluaran ini?')) return;
     try {
-      await deleteMutation.mutateAsync(id);
-      toast('Pengeluaran dihapus', 'success');
+      await deleteMutation.mutateAsync(item.id);
+      const itemLabel = `💰 ${item.jenis} — ${formatCurrency(Number(item.nominal))}`;
+      toast(`🗑️ ${itemLabel}`, 'success');
     } catch (err) {
       toast(getFriendlyErrorMessage(err), 'error');
     }
@@ -491,7 +494,7 @@ export default function RekapanPengeluaranPage() {
                               <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-900">{formatCurrency(it.nominal)}</td>
                               <td className="px-4 py-3 text-right">
                                 <button onClick={() => handleEdit(it)} className="mr-3 text-sm text-sky-600">Edit</button>
-                                <button onClick={() => handleDelete(it.id)} className="text-sm text-rose-600">Hapus</button>
+                                <button onClick={() => handleDelete(it)} className="text-sm text-rose-600">Hapus</button>
                               </td>
                             </tr>
                           ))
@@ -543,7 +546,7 @@ export default function RekapanPengeluaranPage() {
                               <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-900">{formatCurrency(it.nominal)}</td>
                               <td className="px-4 py-3 text-right">
                                 <button onClick={() => handleEdit(it)} className="mr-3 text-sm text-sky-600">Edit</button>
-                                <button onClick={() => handleDelete(it.id)} className="text-sm text-rose-600">Hapus</button>
+                                <button onClick={() => handleDelete(it)} className="text-sm text-rose-600">Hapus</button>
                               </td>
                             </tr>
                           ))
@@ -601,7 +604,7 @@ export default function RekapanPengeluaranPage() {
                               <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-900">{formatCurrency(it.nominal)}</td>
                               <td className="px-4 py-3 text-right">
                                 <button onClick={() => handleEdit(it)} className="mr-3 text-sm text-sky-600">Edit</button>
-                                <button onClick={() => handleDelete(it.id)} className="text-sm text-rose-600">Hapus</button>
+                                <button onClick={() => handleDelete(it)} className="text-sm text-rose-600">Hapus</button>
                               </td>
                             </tr>
                           ))

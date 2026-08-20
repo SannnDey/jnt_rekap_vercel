@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+import ActivityBell from './ActivityBell';
 
 interface HeaderProps {
   title?: string;
@@ -24,7 +25,8 @@ export default function Header({
           {subtitle ? <p className="mt-2 text-sm font-semibold text-slate-200">{subtitle}</p> : null}
           <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">{description}</p>
         </div>
-        <div className="rounded-[2rem] border border-white/10 bg-white/10 px-5 py-4 text-sm text-slate-200 shadow-glow backdrop-blur-xl">
+        <div className="rounded-[2rem] border border-white/10 bg-white/10 px-5 py-4 text-sm text-slate-200 shadow-glow backdrop-blur-xl flex items-center gap-3">
+          <ActivityBell />
           {right ? right : (
             <>
               <p className="font-semibold text-white">Versi 1.0</p>

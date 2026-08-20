@@ -68,15 +68,16 @@ export default function RekapanForm({ editingId, onClose, onDataChange }: Rekapa
 
   const submitExec = async () => {
     try {
+      const itemLabel = `📦 ${formData.waybill || 'Item'}`;
       if (editingId) {
         await updateMutation.mutateAsync({
           id: editingId,
           data: formData,
         });
-        toast('Perubahan rekapan berhasil disimpan.', 'success');
+        toast(`✏️ ${itemLabel}`, 'success');
       } else {
         await createMutation.mutateAsync(formData);
-        toast('Rekapan baru berhasil ditambahkan.', 'success');
+        toast(`✅ ${itemLabel}`, 'success');
       }
       onDataChange();
       onClose();

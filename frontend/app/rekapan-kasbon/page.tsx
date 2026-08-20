@@ -226,12 +226,13 @@ export default function RekapanKasbonPage() {
   const submitKasbon = async () => {
     try {
       const payload = { employee: employee.trim(), tanggal, amount: Number(amount), description: description.trim(), settled };
+      const itemLabel = `💵 ${payload.employee} — ${formatCurrency(payload.amount)}`;
       if (editingId) {
         await updateMutation.mutateAsync({ id: editingId, data: payload });
-        toast('Kasbon diperbarui', 'success');
+        toast(`✏️ ${itemLabel}`, 'success');
       } else {
         await createMutation.mutateAsync(payload);
-        toast('Kasbon dibuat', 'success');
+        toast(`✅ ${itemLabel}`, 'success');
       }
 
       try {
@@ -308,11 +309,12 @@ export default function RekapanKasbonPage() {
       }
     : null;
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (item: any) => {
     if (!confirm('Hapus kasbon ini?')) return;
     try {
-      await deleteMutation.mutateAsync(id);
-      toast('Kasbon dihapus', 'success');
+      await deleteMutation.mutateAsync(item.id);
+      const itemLabel = `💵 ${item.employee} — ${formatCurrency(item.amount)}`;
+      toast(itemLabel, 'success');
       qc.invalidateQueries({ queryKey: ['kasbon-list'] as const });
       qc.invalidateQueries({ queryKey: ['kasbon-summary'] as const });
     } catch (err) {
@@ -749,7 +751,7 @@ export default function RekapanKasbonPage() {
                         <div className="flex items-center gap-3">
                           <div className="text-sm font-semibold">{formatCurrency(it.amount)}</div>
                           <button type="button" onClick={() => handleEdit(it)} className="text-sm text-sky-600">Edit</button>
-                          <button type="button" onClick={() => handleDelete(it.id)} className="text-sm text-rose-600">Hapus</button>
+                          <button type="button" onClick={() => handleDelete(it)} className="text-sm text-rose-600">Hapus</button>
                         </div>
                         </div>
                       ));

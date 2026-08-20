@@ -1,4 +1,5 @@
 ﻿import { NextRequest } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { jsonResponse, errorResponse } from '@/lib/api-utils';
 import { prisma } from '@/lib/prisma';
 import { CreateRekapanOutgoingSchema, UpdateRekapanOutgoingSchema, RekapanOutgoingIdSchema } from '@/lib/zod-schemas';
@@ -110,6 +111,18 @@ export async function POST(request: NextRequest) {
     const total = calculateTotal(sanitized.ongkir, sanitized.asuransi, sanitized.packing);
 
     const rekapan = await prisma.rekapanOutgoing.create({ data: { ...sanitized, total } });
+    try {
+      const currentUserHeader = request.headers.get('x-current-user');
+      let userName = null;
+      if (currentUserHeader) {
+        try { userName = JSON.parse(currentUserHeader).name; } catch {}
+      }
+      const createdLog = await prisma.activityLog.create({ data: { type: 'rekapan.create', details: JSON.stringify({ id: rekapan.id, waybill: rekapan.waybill, provinsi: rekapan.provinsi }).slice(0, 2000), user: userName, read: false } });
+      try { const { publishActivity } = await import('@/lib/activityPubSub'); publishActivity(createdLog); } catch (e) { }
+    } catch (e) {
+      // don't block on logging
+      console.warn('Failed to write activity log', e);
+    }
     return jsonResponse({ success: true, message: 'Rekapan berhasil dibuat', data: rekapan, timestamp: new Date().toISOString() }, 201);
   } catch (error) {
     return errorResponse('Gagal membuat rekapan', 400, String(error));
@@ -144,6 +157,19 @@ export async function PUT(request: NextRequest) {
     }
 
     const rekapan = await prisma.rekapanOutgoing.update({ where: { id: validatedId.id }, data: dataToUpdate });
+    try {
+      const currentUserHeader = request.headers.get('x-current-user');
+      let userName = null;
+      if (currentUserHeader) {
+        try { userName = JSON.parse(currentUserHeader).name; } catch {}
+      }
+      const { computeFieldChanges } = await import('@/lib/utils');
+      const changes = computeFieldChanges(existing as any, dataToUpdate as any);
+      const createdLog = await prisma.activityLog.create({ data: { type: 'rekapan.update', details: JSON.stringify({ id: rekapan.id, waybill: rekapan.waybill, changes }).slice(0, 2000), user: userName, read: false } });
+      try { const { publishActivity } = await import('@/lib/activityPubSub'); publishActivity(createdLog); } catch (e) { }
+    } catch (e) {
+      console.warn('Failed to write activity log', e);
+    }
     return jsonResponse({ success: true, message: 'Rekapan berhasil diperbarui', data: rekapan, timestamp: new Date().toISOString() });
   } catch (error) {
     return errorResponse('Gagal memperbarui rekapan', 400, String(error));
@@ -161,6 +187,17 @@ export async function DELETE(request: NextRequest) {
     if (!rekapan) return errorResponse('Rekapan tidak ditemukan', 404);
 
     await prisma.rekapanOutgoing.delete({ where: { id: validatedId.id } });
+    try {
+      const currentUserHeader = request.headers.get('x-current-user');
+      let userName = null;
+      if (currentUserHeader) {
+        try { userName = JSON.parse(currentUserHeader).name; } catch {}
+      }
+      const createdLog = await prisma.activityLog.create({ data: { type: 'rekapan.delete', details: JSON.stringify({ id: rekapan.id, waybill: rekapan.waybill }).slice(0, 2000), user: userName, read: false } });
+      try { const { publishActivity } = await import('@/lib/activityPubSub'); publishActivity(createdLog); } catch (e) { }
+    } catch (e) {
+      console.warn('Failed to write activity log', e);
+    }
     return jsonResponse({ success: true, message: 'Rekapan berhasil dihapus', data: rekapan, timestamp: new Date().toISOString() });
   } catch (error) {
     return errorResponse('Gagal menghapus rekapan', 400, String(error));

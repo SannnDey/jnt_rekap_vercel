@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -55,6 +56,16 @@ export default function RekapanInternalHarianPage() {
       router.replace('/');
     }
   }, [router]);
+
+  // open edit form if ?openId= present
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get('openId');
+    if (id) {
+      setEditingId(id);
+      setShowForm(true);
+    }
+  }, [searchParams]);
 
   const summaryResponse = useInternalSummary(startDate || undefined, endDate || undefined);
   const summaryData = summaryResponse.data?.data;
@@ -670,6 +681,7 @@ export default function RekapanInternalHarianPage() {
               refreshKey={refreshKey}
               onPageChange={setCurrentPage}
               onEdit={handleEdit}
+              highlightId={editingId}
               onDataChange={handleDataChange}
               readOnly={currentUser?.role === 'driver'}
             />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useInternalList, useDeleteInternal } from '@/hooks/useInternal';
 import { formatDate, formatNumber, getFriendlyErrorMessage } from '@/lib/utils';
 import { useToast } from '@/components/ToastProvider';
@@ -16,6 +16,7 @@ interface InternalTableProps {
   onEdit: (id: string) => void;
   onDataChange: () => void;
   readOnly?: boolean;
+  highlightId?: string | null;
 }
 
 export default function InternalTable({
@@ -28,6 +29,7 @@ export default function InternalTable({
   onEdit,
   onDataChange,
   readOnly = false,
+  highlightId = null,
 }: InternalTableProps) {
   const { data, isLoading, isError, error } = useInternalList(
     currentPage,
@@ -41,18 +43,40 @@ export default function InternalTable({
   const { toast } = useToast();
   const confirm = useConfirm();
 
-  const handleDelete = async (id: string) => {
+  
+
+  const handleDelete = async (item: any) => {
     const ok = await confirm('Apakah Anda yakin ingin menghapus rekapan internal ini?');
     if (!ok) return;
 
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(item.id);
       onDataChange();
-      toast('Rekapan internal berhasil dihapus.', 'success');
+      const itemLabel = `📋 ${item.waybill || 'Item'}`;
+      toast(`🗑️ ${itemLabel}`, 'success');
     } catch (err) {
       toast(getFriendlyErrorMessage(err), 'error');
     }
   };
+
+  const items = data?.data || [];
+  const pagination = data?.pagination;
+
+  useEffect(() => {
+    if (!highlightId) return;
+    const el = document.getElementById(`row-${highlightId}`);
+    if (!el) return;
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-4', 'ring-sky-300', 'bg-sky-50');
+      const t = setTimeout(() => {
+        el.classList.remove('ring-4', 'ring-sky-300', 'bg-sky-50');
+      }, 3200);
+      return () => clearTimeout(t);
+    } catch (e) {
+      // ignore
+    }
+  }, [highlightId, items]);
 
   if (isLoading) {
     return (
@@ -71,9 +95,7 @@ export default function InternalTable({
       </div>
     );
   }
-
-  const items = data?.data || [];
-  const pagination = data?.pagination;
+  
 
   if (items.length === 0) {
     return (
@@ -100,7 +122,7 @@ export default function InternalTable({
           </thead>
           <tbody className="divide-y divide-slate-200">
             {items.map((item: any, idx: number) => (
-              <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+              <tr id={`row-${item.id}`} key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                 <td className="px-5 py-4 text-slate-900">{formatDate(item.tanggalRekap)}</td>
                 <td className="px-5 py-4 text-slate-900 font-medium tracking-tight">{item.waybill}</td>
                 <td className="px-5 py-4 text-slate-900">{item.sprinterDelivery}</td>
@@ -113,7 +135,7 @@ export default function InternalTable({
                       <button onClick={() => onEdit(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 transition hover:bg-sky-100">
                         Edit
                       </button>
-                      <button onClick={() => handleDelete(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 transition hover:bg-rose-100">
+                      <button onClick={() => handleDelete(item)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 transition hover:bg-rose-100">
                         Hapus
                       </button>
                     </div>

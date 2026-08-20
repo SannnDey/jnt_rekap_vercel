@@ -2,6 +2,7 @@
 
 import { useRekapanList, useDeleteRekapan } from '@/hooks/useRekapan';
 import { formatDate, formatCurrency, formatWeight, getFriendlyErrorMessage } from '@/lib/utils';
+import { useEffect } from 'react';
 import { useToast } from '@/components/ToastProvider';
 import { useConfirm } from '@/components/ConfirmProvider';
 import { Trash2, Edit2 } from 'lucide-react';
@@ -19,6 +20,7 @@ interface RekapanTableProps {
   metodePembayaran: string;
   sortBy: string;
   sortOrder: 'asc' | 'desc' | '';
+  highlightId?: string | null;
 }
 
 export default function RekapanTable({
@@ -34,6 +36,7 @@ export default function RekapanTable({
   metodePembayaran,
   sortBy,
   sortOrder,
+  highlightId = null,
 }: RekapanTableProps) {
   const { data, isLoading, isError, error } = useRekapanList(
     currentPage,
@@ -53,18 +56,40 @@ export default function RekapanTable({
   const { toast } = useToast();
   const confirm = useConfirm();
 
-  const handleDelete = async (id: string) => {
+  const items = (data?.data as any) || [];
+  const pagination = (data?.pagination as any);
+
+  useEffect(() => {
+    if (!highlightId) return;
+    const el = document.getElementById(`row-${highlightId}`);
+    if (!el) return;
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-4', 'ring-sky-300', 'bg-sky-50');
+      const t = setTimeout(() => {
+        el.classList.remove('ring-4', 'ring-sky-300', 'bg-sky-50');
+      }, 3200);
+      return () => clearTimeout(t);
+    } catch (e) {
+      // ignore
+    }
+  }, [highlightId, items]);
+
+  const handleDelete = async (item: any) => {
     const ok = await confirm('Apakah Anda yakin ingin menghapus rekapan ini?');
     if (!ok) return;
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(item.id);
       onDataChange();
-      toast('Rekapan berhasil dihapus.', 'success');
+      const itemLabel = `📦 ${item.waybill || 'Item'}`;
+      toast(`🗑️ ${itemLabel}`, 'success');
     } catch (error) {
       const message = getFriendlyErrorMessage(error);
       toast(message, 'error');
     }
   };
+
+  
 
   if (isLoading) {
     return (
@@ -83,9 +108,7 @@ export default function RekapanTable({
       </div>
     );
   }
-
-  const items = (data?.data as any) || [];
-  const pagination = (data?.pagination as any);
+  
 
   if (items.length === 0) {
     return (
@@ -117,7 +140,7 @@ export default function RekapanTable({
           </thead>
           <tbody className="divide-y divide-slate-200">
             {items.map((item: any, idx: number) => (
-              <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+              <tr id={`row-${item.id}`} key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                 <td className="px-6 py-4 text-slate-900">{formatDate(item.tanggal)}</td>
                 <td className="px-6 py-4 text-slate-900 font-medium tracking-tight">{item.waybill}</td>
                 <td className="px-6 py-4 text-slate-900">{item.provinsi}</td>
@@ -143,7 +166,7 @@ export default function RekapanTable({
                       <Edit2 size={18} />
                     </button>
                     <button
-                      onClick={() => handleDelete(item.id)}
+                      onClick={() => handleDelete(item)}
                       disabled={deleteMutation.isPending}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                       title="Delete"

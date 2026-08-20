@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { jsonResponse, errorResponse } from '@/lib/api-utils';
 import { prisma } from '@/lib/prisma';
 import { CreateRekapanOutgoingSchema } from '@/lib/zod-schemas';

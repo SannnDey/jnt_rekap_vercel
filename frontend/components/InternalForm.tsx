@@ -108,12 +108,13 @@ export default function InternalForm({ editingId, onClose, onDataChange }: Inter
     }
 
     try {
+      const itemLabel = `📋 ${formData.waybill || 'Item'}`;
       if (editingId) {
         await updateMutation.mutateAsync({ id: editingId, data: formData });
-        toast('Rekapan internal berhasil diperbarui.', 'success');
+        toast(`✏️ ${itemLabel}`, 'success');
       } else {
         await createMutation.mutateAsync(formData);
-        toast('Rekapan internal berhasil ditambahkan.', 'success');
+        toast(`✅ ${itemLabel}`, 'success');
       }
       onDataChange();
       queryClient.invalidateQueries({ queryKey: ['rekapan-internal-summary'] });

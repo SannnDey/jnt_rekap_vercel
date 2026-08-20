@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { jsonResponse, errorResponse } from '@/lib/api-utils';
 import { prisma } from '@/lib/prisma';
 import { CreateRekapanInternalSchema } from '@/lib/zod-schemas';
@@ -81,6 +82,18 @@ export async function POST(request: NextRequest) {
     };
 
     const rekapan = await prisma.rekapanInternal.create({ data: sanitized });
+
+    try {
+      const currentUserHeader = request.headers.get('x-current-user');
+      let userName = null;
+      if (currentUserHeader) {
+        try { userName = JSON.parse(currentUserHeader).name; } catch {}
+      }
+      const createdLog = await prisma.activityLog.create({ data: { type: 'rekapan_internal.create', details: JSON.stringify({ id: rekapan.id, waybill: rekapan.waybill }).slice(0, 2000), user: userName, read: false } });
+      try { const { publishActivity } = await import('@/lib/activityPubSub'); publishActivity(createdLog); } catch (e) { }
+    } catch (e) {
+      console.warn('Failed to write activity log', e);
+    }
 
     return jsonResponse({
       success: true,

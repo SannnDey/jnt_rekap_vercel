@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { API_BASE_URL } from './config';
+import { authService } from './auth';
 import {
   RekapanOutgoing,
   CreateRekapanInput,
@@ -53,6 +54,15 @@ class ApiClient {
     // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
+        try {
+          const user = typeof window !== 'undefined' ? authService.getCurrentUser() : null;
+          if (user) {
+            config.headers = config.headers || {};
+            config.headers['x-current-user'] = JSON.stringify({ id: user.id, name: user.name, role: user.role });
+          }
+        } catch (e) {
+          // ignore
+        }
         console.log(`📡 ${config.method?.toUpperCase()} ${config.url}`);
         return config;
       },

@@ -269,14 +269,15 @@ export default function RekapanSchedulePage() {
     });
   };
 
-  const handleDeleteAttendance = (id: string) => {
+  const handleDeleteAttendance = (record: any) => {
     const confirmed = window.confirm('Hapus rekap kehadiran ini?');
     if (!confirmed) return;
 
-    deleteAttendance.mutate(id, {
+    deleteAttendance.mutate(record.id, {
       onSuccess: () => {
-        toast('Rekap kehadiran berhasil dihapus.', 'success');
-        if (inlineEditingId === id) {
+        const itemLabel = `✅ ${record.employeeName}`;
+        toast(`🗑️ ${itemLabel}`, 'success');
+        if (inlineEditingId === record.id) {
           handleCancelInlineEdit();
         }
       },
@@ -303,7 +304,8 @@ export default function RekapanSchedulePage() {
       },
       {
         onSuccess: () => {
-          toast(`Rekap kehadiran ${selectedEmployee.name} berhasil disimpan.`, 'success');
+          const itemLabel = `✅ ${selectedEmployee.name}`;
+          toast(`✅ ${itemLabel}`, 'success');
           resetAttendanceForm();
         },
         onError: () => {
@@ -329,7 +331,8 @@ export default function RekapanSchedulePage() {
       { id: record.id, data: payload },
       {
         onSuccess: () => {
-          toast(`Rekap kehadiran ${record.employeeName} berhasil diperbarui.`, 'success');
+          const itemLabel = `✅ ${record.employeeName}`;
+          toast(`✏️ ${itemLabel}`, 'success');
           handleCancelInlineEdit();
         },
         onError: () => {
@@ -556,7 +559,7 @@ export default function RekapanSchedulePage() {
             <Link href="/" className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
               Beranda
             </Link>
-            {currentUser?.role === 'admin' && (
+            {currentUser?.role === 'developer' && (
               <Link href="/manage-users" className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                 Manage User
               </Link>
@@ -846,7 +849,14 @@ export default function RekapanSchedulePage() {
                 <label className="block text-sm font-semibold text-slate-700">Kehadiran</label>
                 <select
                   value={kehadiran}
-                  onChange={(event) => setKehadiran(event.target.value as DriverAttendanceStatus)}
+                  onChange={(event) => {
+                    const newStatus = event.target.value as DriverAttendanceStatus;
+                    setKehadiran(newStatus);
+                    // Clear partner if status doesn't allow partner
+                    if (!partnerAllowedStatuses.includes(newStatus)) {
+                      setPartnerId('');
+                    }
+                  }}
                   className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500"
                 >
                   {(selectedEmployee?.role === 'Admin' ? adminStatuses : driverStatuses).map((status) => (
@@ -859,13 +869,13 @@ export default function RekapanSchedulePage() {
 
               {selectedEmployee?.role === 'Driver' && partnerAllowedStatuses.includes(kehadiran) && (
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700">Setengah Bersama</label>
+                  <label className="block text-sm font-semibold text-slate-700">Setengah Bersama (Opsional)</label>
                   <select
                     value={partnerId}
                     onChange={(event) => setPartnerId(event.target.value)}
                     className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500"
                   >
-                    <option value="">Pilih driver lain</option>
+                    <option value="">Tidak ada partner</option>
                     {driverPartners.map((partner) => (
                       <option key={partner.id} value={partner.id}>
                         {partner.name}
@@ -898,7 +908,8 @@ export default function RekapanSchedulePage() {
                     <li>Masukkan tanggal dan pilih karyawan yang tersedia.</li>
                     <li>Admin: hadir, sakit, izin, alpha.</li>
                     <li>Driver: hadir, sakit, izin, alpha, full GW + deliv, full GW no deliv, GW setengah.</li>
-                    <li>Untuk GW Setengah dan status Full GW, pilih partner driver jika diperlukan.</li>
+                    <li>Partner driver bersifat <strong>opsional</strong>. Dapat dikosongkan atau dipilih jika diperlukan untuk status: Hadir, Full GW + Deliv, Full GW No Deliv, GW Setengah.</li>
+                    <li>Untuk status Sakit, Izin, Alpha - kolom partner akan otomatis kosong.</li>
                   </ul>
                 </div>
                 <button
@@ -1028,7 +1039,7 @@ export default function RekapanSchedulePage() {
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => handleDeleteAttendance(record.id)}
+                                        onClick={() => handleDeleteAttendance(record)}
                                         className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
                                       >
                                         Delete
@@ -1094,7 +1105,15 @@ export default function RekapanSchedulePage() {
                                 <td className="px-6 py-4">
                                   <select
                                     value={inlineEditValues.attendanceStatus}
-                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, attendanceStatus: event.target.value as DriverAttendanceStatus }))}
+                                    onChange={(event) => {
+                                      const newStatus = event.target.value as DriverAttendanceStatus;
+                                      const newInlineEditValues = { ...inlineEditValues, attendanceStatus: newStatus };
+                                      // Clear partner if status doesn't allow partner
+                                      if (!partnerAllowedStatuses.includes(newStatus)) {
+                                        newInlineEditValues.partnerId = '';
+                                      }
+                                      setInlineEditValues(newInlineEditValues);
+                                    }}
                                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                                   >
                                     {driverStatuses.map((status) => (
@@ -1102,18 +1121,25 @@ export default function RekapanSchedulePage() {
                                     ))}
                                   </select>
                                 </td>
-                                <td className="px-6 py-4">
-                                  <select
-                                    value={inlineEditValues.partnerId}
-                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, partnerId: event.target.value }))}
-                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                                  >
-                                    <option value="">Pilih partner</option>
-                                    {employees.filter((employee) => employee.role === 'Driver' && employee.id !== record.employeeId).map((employee) => (
-                                      <option key={employee.id} value={employee.id}>{employee.name}</option>
-                                    ))}
-                                  </select>
-                                </td>
+                                {partnerAllowedStatuses.includes(inlineEditValues.attendanceStatus) && (
+                                  <td className="px-6 py-4">
+                                    <select
+                                      value={inlineEditValues.partnerId}
+                                      onChange={(event) => setInlineEditValues((current) => ({ ...current, partnerId: event.target.value }))}
+                                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                    >
+                                      <option value="">Pilih partner (opsional)</option>
+                                      {employees.filter((employee) => employee.role === 'Driver' && employee.id !== record.employeeId).map((employee) => (
+                                        <option key={employee.id} value={employee.id}>{employee.name}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                )}
+                                {!partnerAllowedStatuses.includes(inlineEditValues.attendanceStatus) && (
+                                  <td className="px-6 py-4">
+                                    <span className="text-slate-400">-</span>
+                                  </td>
+                                )}
                                 <td className="px-6 py-4">
                                   <textarea
                                     rows={2}
@@ -1162,7 +1188,7 @@ export default function RekapanSchedulePage() {
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => handleDeleteAttendance(record.id)}
+                                        onClick={() => handleDeleteAttendance(record)}
                                         className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
                                       >
                                         Delete

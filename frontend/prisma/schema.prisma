@@ -50,8 +50,10 @@ model ActivityLog {
   type      String   @db.VarChar(100)
   details   String?  @db.Text
   user      String?  @db.VarChar(100)
+  read      Boolean  @default(false)
   createdAt DateTime @default(now())
   @@index([type])
+  @@index([read])
   @@index([createdAt])
   @@map("activity_log")
 }

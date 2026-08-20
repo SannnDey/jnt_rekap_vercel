@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import Header from '@/components/Header';
@@ -124,6 +125,16 @@ export default function HomePage() {
       }
     };
   }, [showForm]);
+
+  // open edit form if ?openId= present
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get('openId');
+    if (id) {
+      setEditingId(id);
+      setShowForm(true);
+    }
+  }, [searchParams]);
 
   const headerRight = (
     <div className="flex items-center gap-3">
@@ -1172,6 +1183,7 @@ export default function HomePage() {
               refreshKey={refreshKey}
               onPageChange={setCurrentPage}
               onEdit={handleEdit}
+              highlightId={editingId}
               onDataChange={handleRefreshData}
               provinsi={provinsi}
               metodePembayaran={metodePembayaran}

@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { jsonResponse, errorResponse } from '@/lib/api-utils';
 import { prisma } from '@/lib/prisma';
 import { buildDateRangeFilter } from '@/lib/api-route-utils';
@@ -67,6 +68,18 @@ export async function POST(request: NextRequest) {
         settled: validated.settled ?? false,
       },
     });
+
+    try {
+      const currentUserHeader = request.headers.get('x-current-user');
+      let userName = null;
+      if (currentUserHeader) {
+        try { userName = JSON.parse(currentUserHeader).name; } catch {}
+      }
+      const createdLog = await prisma.activityLog.create({ data: { type: 'kasbon.create', details: JSON.stringify({ id: kasbon.id, employee: kasbon.employee, amount: kasbon.amount }).slice(0, 2000), user: userName, read: false } });
+      try { const { publishActivity } = await import('@/lib/activityPubSub'); publishActivity(createdLog); } catch (e) { }
+    } catch (e) {
+      console.warn('Failed to write activity log', e);
+    }
 
     return jsonResponse({ success: true, message: 'Kasbon berhasil dibuat', data: kasbon, timestamp: new Date().toISOString() }, 201);
   } catch (error) {
