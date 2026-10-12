@@ -79,6 +79,11 @@ const isAttendancePresent = (record: AttendanceRecord) =>
     ? isDriverPresentStatus(record.kehadiran)
     : record.kehadiran === 'Hadir';
 
+const getSafePartnerId = (employeeId: string, partnerId?: string) => {
+  if (!partnerId || !employeeId) return undefined;
+  return partnerId === employeeId ? undefined : partnerId;
+};
+
 export default function RekapanSchedulePage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -108,6 +113,8 @@ export default function RekapanSchedulePage() {
   const [exportPreviewRows, setExportPreviewRows] = useState<AttendanceRecord[]>([]);
   const [exportSelectedMonth, setExportSelectedMonth] = useState('');
   const [exportPeriodLabel, setExportPeriodLabel] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [employeeSearch, setEmployeeSearch] = useState('');
 
   const { data: employees = [] } = useScheduleEmployees();
   const { data: attendances = [] } = useScheduleAttendances();
@@ -163,36 +170,110 @@ export default function RekapanSchedulePage() {
     [attendanceRecords, todayString]
   );
 
-  const adminRecords = attendanceRecords.filter((record) => record.role === 'Admin');
-  const driverRecords = attendanceRecords.filter((record) => record.role === 'Driver');
-  const groupByDate = (records: AttendanceRecord[]) => {
-    const map = new Map<string, AttendanceRecord[]>();
+  const selectedMonthRecords = useMemo(
+    () => attendanceRecords.filter((record) => record.tanggal.startsWith(selectedMonth)),
+    [attendanceRecords, selectedMonth]
+  );
+  const adminRecords = selectedMonthRecords.filter((record) => record.role === 'Admin');
+  const driverRecords = selectedMonthRecords.filter((record) => record.role === 'Driver');
+  const groupByEmployeeAndDate = (records: AttendanceRecord[]) => {
+    const map = new Map<string, Map<string, AttendanceRecord[]>>();
     for (const r of records) {
-      const key = r.tanggal;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(r);
+      const employeeKey = r.employeeName;
+      if (!map.has(employeeKey)) map.set(employeeKey, new Map());
+      const dateMap = map.get(employeeKey)!;
+      const dateKey = r.tanggal;
+      if (!dateMap.has(dateKey)) dateMap.set(dateKey, []);
+      dateMap.get(dateKey)!.push(r);
     }
-    return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+
+    return Array.from(map.entries())
+      .sort(([nameA], [nameB]) => nameA.localeCompare(nameB))
+      .map(([employeeName, dateMap]) => ({
+        employeeName,
+        dates: Array.from(dateMap.entries())
+          .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+          .map(([date, items]) => ({ date, items })),
+      }));
   };
-  const groupedAdmin = groupByDate(adminRecords);
-  const groupedDriver = groupByDate(driverRecords);
+  const groupedAdmin = groupByEmployeeAndDate(adminRecords);
+  const groupedDriver = groupByEmployeeAndDate(driverRecords);
+  const normalizedEmployeeSearch = employeeSearch.trim().toLocaleLowerCase();
+  const filteredGroupedAdmin = useMemo(
+    () => groupedAdmin.filter(({ employeeName }) => employeeName.toLocaleLowerCase().includes(normalizedEmployeeSearch)),
+    [groupedAdmin, normalizedEmployeeSearch]
+  );
+  const filteredGroupedDriver = useMemo(
+    () => groupedDriver.filter(({ employeeName }) => employeeName.toLocaleLowerCase().includes(normalizedEmployeeSearch)),
+    [groupedDriver, normalizedEmployeeSearch]
+  );
+  const summarizeMonthlyRecords = (records: AttendanceRecord[]) => {
+    const summaries = new Map<string, {
+      employeeId: string;
+      employeeName: string;
+      totalHadir: number;
+      hadirBiasa: number;
+      sakit: number;
+      izin: number;
+      alpha: number;
+      fullGwDeliv: number;
+      fullGwNoDeliv: number;
+      gwSetengah: number;
+    }>();
+
+    for (const record of records) {
+      const summary = summaries.get(record.employeeId) ?? {
+        employeeId: record.employeeId,
+        employeeName: record.employeeName,
+        totalHadir: 0,
+        hadirBiasa: 0,
+        sakit: 0,
+        izin: 0,
+        alpha: 0,
+        fullGwDeliv: 0,
+        fullGwNoDeliv: 0,
+        gwSetengah: 0,
+      };
+
+      if (record.role === 'Driver' && isDriverPresentStatus(record.kehadiran)) summary.totalHadir += 1;
+      if (record.kehadiran === 'Hadir') {
+        summary.hadirBiasa += 1;
+        if (record.role === 'Admin') summary.totalHadir += 1;
+      }
+      if (record.kehadiran === 'Sakit') summary.sakit += 1;
+      if (record.kehadiran === 'Izin') summary.izin += 1;
+      if (record.kehadiran === 'Alpha') summary.alpha += 1;
+      if (record.kehadiran === 'Full GW + Deliv') summary.fullGwDeliv += 1;
+      if (record.kehadiran === 'Full GW No Deliv') summary.fullGwNoDeliv += 1;
+      if (record.kehadiran === 'GW Setengah') summary.gwSetengah += 1;
+
+      summaries.set(record.employeeId, summary);
+    }
+
+    return Array.from(summaries.values()).sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+  };
+  const adminMonthlySummary = summarizeMonthlyRecords(adminRecords).filter(({ employeeName }) =>
+    employeeName.toLocaleLowerCase().includes(normalizedEmployeeSearch)
+  );
+  const driverMonthlySummary = summarizeMonthlyRecords(driverRecords).filter(({ employeeName }) =>
+    employeeName.toLocaleLowerCase().includes(normalizedEmployeeSearch)
+  );
   const driverPresentCount = useMemo(
     () => driverRecords.filter((record) => isDriverPresentStatus(record.kehadiran)).length,
     [driverRecords]
   );
-  const totalRecords = attendanceRecords.length;
+  const totalRecords = selectedMonthRecords.length;
   const canExportData = currentUser?.role === 'admin';
 
   const handleEmployeeChange = (value: string) => {
     const nextEmployee = employees.find((item) => item.id === value);
     setEmployeeId(value);
     setKeterangan('');
+    setPartnerId('');
     if (nextEmployee?.role === 'Driver') {
       setKehadiran('Hadir');
-      setPartnerId(driverPartners[0]?.id ?? '');
     } else {
       setKehadiran('Hadir');
-      setPartnerId('');
     }
   };
 
@@ -294,13 +375,17 @@ export default function RekapanSchedulePage() {
       return;
     }
 
+    const resolvedPartnerId = partnerAllowedStatuses.includes(kehadiran)
+      ? getSafePartnerId(selectedEmployee.id, partnerId)
+      : undefined;
+
     createAttendance.mutate(
       {
         tanggal,
         employeeId: selectedEmployee.id,
         attendanceStatus: kehadiran,
         keterangan: keterangan.trim() || undefined,
-        partnerId: partnerAllowedStatuses.includes(kehadiran) ? partnerId || undefined : undefined,
+        partnerId: resolvedPartnerId,
       },
       {
         onSuccess: () => {
@@ -323,7 +408,7 @@ export default function RekapanSchedulePage() {
       keterangan: inlineEditValues.keterangan.trim() || undefined,
       partnerId:
         record.role === 'Driver' && partnerAllowedStatuses.includes(inlineEditValues.attendanceStatus)
-          ? inlineEditValues.partnerId || undefined
+          ? getSafePartnerId(record.employeeId, inlineEditValues.partnerId)
           : undefined,
     };
 
@@ -597,6 +682,7 @@ export default function RekapanSchedulePage() {
               </div>
             </div>
           </div>
+
         </section>
 
         {exportPreviewOpen && (
@@ -869,13 +955,13 @@ export default function RekapanSchedulePage() {
 
               {selectedEmployee?.role === 'Driver' && partnerAllowedStatuses.includes(kehadiran) && (
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700">Setengah Bersama (Opsional)</label>
+                  <label className="block text-sm font-semibold text-slate-700">Partner Driver (Opsional)</label>
                   <select
                     value={partnerId}
                     onChange={(event) => setPartnerId(event.target.value)}
                     className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500"
                   >
-                    <option value="">Tidak ada partner</option>
+                    <option value="">Tidak ada partner / tanpa partner</option>
                     {driverPartners.map((partner) => (
                       <option key={partner.id} value={partner.id}>
                         {partner.name}
@@ -883,7 +969,7 @@ export default function RekapanSchedulePage() {
                     ))}
                   </select>
                   {driverPartners.length === 0 && (
-                    <p className="mt-2 text-sm text-rose-600">Belum ada driver lain yang tersedia.</p>
+                    <p className="mt-2 text-sm text-rose-600">Belum ada driver lain yang tersedia. Jika tidak ada partner, pilih “Tidak ada partner / tanpa partner”.</p>
                   )}
                 </div>
               )}
@@ -925,16 +1011,115 @@ export default function RekapanSchedulePage() {
 
         <section className="rounded-[2rem] border border-slate-200 bg-white/95 p-8 shadow-2xl shadow-slate-200/40 backdrop-blur-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold text-slate-900">Daftar Rekap Kehadiran</h2>
-              <p className="mt-2 text-sm text-slate-600">Rekap kehadiran dipisah berdasarkan peran Admin dan Driver.</p>
-            </div>
+            <div className="text-sm font-medium text-slate-700">Filter periode dan jumlah data</div>
             <div className="inline-flex flex-wrap items-center gap-3">
+              <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <span>Bulan</span>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(event) => setSelectedMonth(event.target.value || new Date().toISOString().slice(0, 7))}
+                  className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 outline-none focus:border-sky-500"
+                />
+              </label>
               <span className="rounded-full bg-slate-100 px-4 py-2 text-sm text-slate-700">Total: {totalRecords}</span>
               <span className="rounded-full bg-emerald-100 px-4 py-2 text-sm text-emerald-700">Admin: {adminRecords.length}</span>
               <span className="rounded-full bg-cyan-100 px-4 py-2 text-sm text-cyan-700">Driver: {driverRecords.length}</span>
               <span className="rounded-full bg-emerald-50 px-4 py-2 text-sm text-emerald-700">Hadir Driver: {driverPresentCount}</span>
             </div>
+          </div>
+
+          <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
+            <label className="block text-sm font-semibold text-slate-700">Cari nama karyawan</label>
+            <input
+              type="text"
+              value={employeeSearch}
+              onChange={(event) => setEmployeeSearch(event.target.value)}
+              placeholder="Ketik nama Admin atau Driver, misalnya Eko"
+              className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-sky-500"
+            />
+            <p className="mt-2 text-xs text-slate-500">Pencarian nama berlaku untuk daftar rekap dan ringkasan Admin maupun Driver.</p>
+          </div>
+
+          <div className="mt-8 space-y-6">
+            <div>
+              <h3 className="text-xl font-semibold text-slate-900">Ringkasan Kehadiran Bulan {computeExportMonthLabel(selectedMonth)}</h3>
+              <p className="mt-1 text-sm text-slate-600">Jumlah status kehadiran setiap karyawan pada bulan terpilih.</p>
+            </div>
+
+            <div className="overflow-hidden rounded-[1.5rem] border border-slate-200">
+              <div className="bg-emerald-50 px-5 py-3"><h4 className="font-semibold text-emerald-800">Ringkasan Admin</h4></div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-700">
+                    <tr>
+                      <th className="px-5 py-3 font-semibold">Nama</th>
+                      <th className="px-5 py-3 text-center font-semibold">Hadir</th>
+                      <th className="px-5 py-3 text-center font-semibold">Sakit</th>
+                      <th className="px-5 py-3 text-center font-semibold">Izin</th>
+                      <th className="px-5 py-3 text-center font-semibold">Alpha</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {adminMonthlySummary.length === 0 ? (
+                      <tr><td colSpan={5} className="px-5 py-6 text-center text-slate-500">{normalizedEmployeeSearch ? `Tidak ada ringkasan Admin yang cocok dengan "${employeeSearch.trim()}".` : 'Tidak ada ringkasan Admin untuk bulan ini.'}</td></tr>
+                    ) : adminMonthlySummary.map((summary) => (
+                      <tr key={summary.employeeId}>
+                        <td className="px-5 py-3 font-medium text-slate-900">{summary.employeeName}</td>
+                        <td className="px-5 py-3 text-center">{summary.hadirBiasa} hari</td>
+                        <td className="px-5 py-3 text-center">{summary.sakit} hari</td>
+                        <td className="px-5 py-3 text-center">{summary.izin} hari</td>
+                        <td className="px-5 py-3 text-center">{summary.alpha} hari</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-[1.5rem] border border-slate-200">
+              <div className="bg-cyan-50 px-5 py-3"><h4 className="font-semibold text-cyan-800">Ringkasan Driver</h4></div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-700">
+                    <tr>
+                      <th className="px-5 py-3 font-semibold">Nama</th>
+                      <th className="px-5 py-3 text-center font-semibold">Total Hadir</th>
+                      <th className="px-5 py-3 text-center font-semibold">Hadir</th>
+                      <th className="px-5 py-3 text-center font-semibold">Full GW + Deliv</th>
+                      <th className="px-5 py-3 text-center font-semibold">Full GW No Deliv</th>
+                      <th className="px-5 py-3 text-center font-semibold">GW Setengah</th>
+                      <th className="px-5 py-3 text-center font-semibold">Sakit</th>
+                      <th className="px-5 py-3 text-center font-semibold">Izin</th>
+                      <th className="px-5 py-3 text-center font-semibold">Alpha</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {driverMonthlySummary.length === 0 ? (
+                      <tr><td colSpan={9} className="px-5 py-6 text-center text-slate-500">{normalizedEmployeeSearch ? `Tidak ada ringkasan Driver yang cocok dengan "${employeeSearch.trim()}".` : 'Tidak ada ringkasan Driver untuk bulan ini.'}</td></tr>
+                    ) : driverMonthlySummary.map((summary) => (
+                      <tr key={summary.employeeId}>
+                        <td className="px-5 py-3 font-medium text-slate-900">{summary.employeeName}</td>
+                        <td className="px-5 py-3 text-center font-semibold text-emerald-700">{summary.totalHadir} hari</td>
+                        <td className="px-5 py-3 text-center">{summary.hadirBiasa}</td>
+                        <td className="px-5 py-3 text-center">{summary.fullGwDeliv}</td>
+                        <td className="px-5 py-3 text-center">{summary.fullGwNoDeliv}</td>
+                        <td className="px-5 py-3 text-center">{summary.gwSetengah}</td>
+                        <td className="px-5 py-3 text-center">{summary.sakit}</td>
+                        <td className="px-5 py-3 text-center">{summary.izin}</td>
+                        <td className="px-5 py-3 text-center">{summary.alpha}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-xs text-slate-500">Total Hadir Driver mencakup status Hadir, Full GW + Deliv, Full GW No Deliv, dan GW Setengah.</p>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <h2 className="text-2xl font-semibold text-slate-900">Daftar Rekap Kehadiran</h2>
+            <p className="mt-2 text-sm text-slate-600">Tampilan data saat ini disesuaikan per bulan untuk mempermudah review rekap periode tertentu.</p>
           </div>
 
           <div className="mt-8 space-y-8">
@@ -953,105 +1138,115 @@ export default function RekapanSchedulePage() {
                     <th className="px-6 py-4 font-semibold">Aksi</th>
                   </tr>
                 </thead>
-                {groupedAdmin.length === 0 ? (
+                {filteredGroupedAdmin.length === 0 ? (
                   <tbody className="divide-y divide-slate-200 bg-white">
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-500">Belum ada data Admin.</td>
+                      <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-500">
+                        {normalizedEmployeeSearch
+                          ? `Tidak ada data Admin untuk nama "${employeeSearch.trim()}" di bulan ${computeExportMonthLabel(selectedMonth)}.`
+                          : `Belum ada data Admin untuk bulan ${computeExportMonthLabel(selectedMonth)}.`}
+                      </td>
                     </tr>
                   </tbody>
                 ) : (
-                  groupedAdmin.map(([date, rows]) => (
-                    <tbody key={date} className="divide-y divide-slate-200 bg-white">
-                      <tr className="bg-slate-100">
-                        <td colSpan={6} className="px-6 py-2 font-semibold text-slate-700">{date}</td>
+                  filteredGroupedAdmin.map(({ employeeName, dates }) => (
+                    <tbody key={employeeName} className="divide-y divide-slate-200 bg-white">
+                      <tr className="bg-slate-200/80">
+                        <td colSpan={6} className="px-6 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
+                          {employeeName}
+                        </td>
                       </tr>
-                      {rows.map((record) => {
-                        const idx = adminRecords.findIndex((r) => r.id === record.id);
-                        return (
-                          <tr key={record.id} className={idx % 2 === 0 ? 'bg-slate-50' : ''}>
-                            <td className="px-6 py-4 font-medium text-slate-900">{idx + 1}</td>
-                            {inlineEditingId === record.id ? (
-                              <>
-                                <td className="px-6 py-4">
-                                  <input
-                                    type="date"
-                                    value={inlineEditValues.tanggal}
-                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, tanggal: event.target.value }))}
-                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                                  />
-                                </td>
-                                <td className="px-6 py-4">{record.employeeName}</td>
-                                <td className="px-6 py-4">
-                                  <select
-                                    value={inlineEditValues.attendanceStatus}
-                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, attendanceStatus: event.target.value as DriverAttendanceStatus }))}
-                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                                  >
-                                    {adminStatuses.map((status) => (
-                                      <option key={status} value={status}>{status}</option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <textarea
-                                    rows={2}
-                                    value={inlineEditValues.keterangan}
-                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, keterangan: event.target.value }))}
-                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                                  />
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex flex-wrap gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleInlineSave(record)}
-                                      className="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                      {dates.map(({ date, items }) => (
+                        <>
+                          <tr key={`${employeeName}-${date}-header`} className="bg-slate-100">
+                            <td colSpan={6} className="px-6 py-2 font-semibold text-slate-700">{date}</td>
+                          </tr>
+                          {items.map((record, index) => (
+                            <tr key={record.id} className={index % 2 === 0 ? 'bg-slate-50' : ''}>
+                              <td className="px-6 py-4 font-medium text-slate-900">{index + 1}</td>
+                              {inlineEditingId === record.id ? (
+                                <>
+                                  <td className="px-6 py-4">
+                                    <input
+                                      type="date"
+                                      value={inlineEditValues.tanggal}
+                                      onChange={(event) => setInlineEditValues((current) => ({ ...current, tanggal: event.target.value }))}
+                                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                    />
+                                  </td>
+                                  <td className="px-6 py-4">{record.employeeName}</td>
+                                  <td className="px-6 py-4">
+                                    <select
+                                      value={inlineEditValues.attendanceStatus}
+                                      onChange={(event) => setInlineEditValues((current) => ({ ...current, attendanceStatus: event.target.value as DriverAttendanceStatus }))}
+                                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                                     >
-                                      Simpan
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleCancelInlineEdit}
-                                      className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                                    >
-                                      Batal
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="px-6 py-4">{record.tanggal}</td>
-                                <td className="px-6 py-4">{record.employeeName}</td>
-                                <td className="px-6 py-4">
-                                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyle[record.kehadiran]}`}>{record.kehadiran}</span>
-                                </td>
-                                <td className="px-6 py-4">{record.keterangan || '-'}</td>
-                                <td className="px-6 py-4">
-                                  {currentUser?.role === 'admin' ? (
+                                      {adminStatuses.map((status) => (
+                                        <option key={status} value={status}>{status}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <textarea
+                                      rows={2}
+                                      value={inlineEditValues.keterangan}
+                                      onChange={(event) => setInlineEditValues((current) => ({ ...current, keterangan: event.target.value }))}
+                                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                    />
+                                  </td>
+                                  <td className="px-6 py-4">
                                     <div className="flex flex-wrap gap-2">
                                       <button
                                         type="button"
-                                        onClick={() => handleEditAttendance(record)}
-                                        className="rounded-full border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-50"
+                                        onClick={() => handleInlineSave(record)}
+                                        className="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
                                       >
-                                        Edit
+                                        Simpan
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => handleDeleteAttendance(record)}
-                                        className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                                        onClick={handleCancelInlineEdit}
+                                        className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                                       >
-                                        Delete
+                                        Batal
                                       </button>
                                     </div>
-                                  ) : null}
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        );
-                      })}
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="px-6 py-4">{record.tanggal}</td>
+                                  <td className="px-6 py-4">{record.employeeName}</td>
+                                  <td className="px-6 py-4">
+                                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyle[record.kehadiran]}`}>{record.kehadiran}</span>
+                                  </td>
+                                  <td className="px-6 py-4">{record.keterangan || '-'}</td>
+                                  <td className="px-6 py-4">
+                                    {currentUser?.role === 'admin' ? (
+                                      <div className="flex flex-wrap gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEditAttendance(record)}
+                                          className="rounded-full border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-50"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteAttendance(record)}
+                                          className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          ))}
+                        </>
+                      ))}
                     </tbody>
                   ))
                 )}
@@ -1074,139 +1269,149 @@ export default function RekapanSchedulePage() {
                     <th className="px-6 py-4 font-semibold">Aksi</th>
                   </tr>
                 </thead>
-                {groupedDriver.length === 0 ? (
+                {filteredGroupedDriver.length === 0 ? (
                   <tbody className="divide-y divide-slate-200 bg-white">
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">Belum ada data Driver.</td>
+                      <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">
+                        {normalizedEmployeeSearch
+                          ? `Tidak ada data Driver untuk nama "${employeeSearch.trim()}" di bulan ${computeExportMonthLabel(selectedMonth)}.`
+                          : `Belum ada data Driver untuk bulan ${computeExportMonthLabel(selectedMonth)}.`}
+                      </td>
                     </tr>
                   </tbody>
                 ) : (
-                  groupedDriver.map(([date, rows]) => (
-                    <tbody key={date} className="divide-y divide-slate-200 bg-white">
-                      <tr className="bg-slate-100">
-                        <td colSpan={7} className="px-6 py-2 font-semibold text-slate-700">{date}</td>
+                  filteredGroupedDriver.map(({ employeeName, dates }) => (
+                    <tbody key={employeeName} className="divide-y divide-slate-200 bg-white">
+                      <tr className="bg-cyan-100/60">
+                        <td colSpan={7} className="px-6 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-700">
+                          {employeeName}
+                        </td>
                       </tr>
-                      {rows.map((record) => {
-                        const idx = driverRecords.findIndex((r) => r.id === record.id);
-                        return (
-                          <tr key={record.id} className={idx % 2 === 0 ? 'bg-slate-50' : ''}>
-                            <td className="px-6 py-4 font-medium text-slate-900">{idx + 1}</td>
-                            {inlineEditingId === record.id ? (
-                              <>
-                                <td className="px-6 py-4">
-                                  <input
-                                    type="date"
-                                    value={inlineEditValues.tanggal}
-                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, tanggal: event.target.value }))}
-                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                                  />
-                                </td>
-                                <td className="px-6 py-4">{record.employeeName}</td>
-                                <td className="px-6 py-4">
-                                  <select
-                                    value={inlineEditValues.attendanceStatus}
-                                    onChange={(event) => {
-                                      const newStatus = event.target.value as DriverAttendanceStatus;
-                                      const newInlineEditValues = { ...inlineEditValues, attendanceStatus: newStatus };
-                                      // Clear partner if status doesn't allow partner
-                                      if (!partnerAllowedStatuses.includes(newStatus)) {
-                                        newInlineEditValues.partnerId = '';
-                                      }
-                                      setInlineEditValues(newInlineEditValues);
-                                    }}
-                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                                  >
-                                    {driverStatuses.map((status) => (
-                                      <option key={status} value={status}>{status}</option>
-                                    ))}
-                                  </select>
-                                </td>
-                                {partnerAllowedStatuses.includes(inlineEditValues.attendanceStatus) && (
+                      {dates.map(({ date, items }) => (
+                        <>
+                          <tr key={`${employeeName}-${date}-header`} className="bg-slate-100">
+                            <td colSpan={7} className="px-6 py-2 font-semibold text-slate-700">{date}</td>
+                          </tr>
+                          {items.map((record, index) => (
+                            <tr key={record.id} className={index % 2 === 0 ? 'bg-slate-50' : ''}>
+                              <td className="px-6 py-4 font-medium text-slate-900">{index + 1}</td>
+                              {inlineEditingId === record.id ? (
+                                <>
+                                  <td className="px-6 py-4">
+                                    <input
+                                      type="date"
+                                      value={inlineEditValues.tanggal}
+                                      onChange={(event) => setInlineEditValues((current) => ({ ...current, tanggal: event.target.value }))}
+                                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                    />
+                                  </td>
+                                  <td className="px-6 py-4">{record.employeeName}</td>
                                   <td className="px-6 py-4">
                                     <select
-                                      value={inlineEditValues.partnerId}
-                                      onChange={(event) => setInlineEditValues((current) => ({ ...current, partnerId: event.target.value }))}
+                                      value={inlineEditValues.attendanceStatus}
+                                      onChange={(event) => {
+                                        const newStatus = event.target.value as DriverAttendanceStatus;
+                                        const newInlineEditValues = { ...inlineEditValues, attendanceStatus: newStatus };
+                                        if (!partnerAllowedStatuses.includes(newStatus)) {
+                                          newInlineEditValues.partnerId = '';
+                                        }
+                                        setInlineEditValues(newInlineEditValues);
+                                      }}
                                       className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                                     >
-                                      <option value="">Pilih partner (opsional)</option>
-                                      {employees.filter((employee) => employee.role === 'Driver' && employee.id !== record.employeeId).map((employee) => (
-                                        <option key={employee.id} value={employee.id}>{employee.name}</option>
+                                      {driverStatuses.map((status) => (
+                                        <option key={status} value={status}>{status}</option>
                                       ))}
                                     </select>
                                   </td>
-                                )}
-                                {!partnerAllowedStatuses.includes(inlineEditValues.attendanceStatus) && (
+                                  {partnerAllowedStatuses.includes(inlineEditValues.attendanceStatus) && (
+                                    <td className="px-6 py-4">
+                                      <select
+                                        value={inlineEditValues.partnerId}
+                                        onChange={(event) => setInlineEditValues((current) => ({ ...current, partnerId: event.target.value }))}
+                                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                      >
+                                        <option value="">Tidak ada partner / tanpa partner</option>
+                                        {employees.filter((employee) => employee.role === 'Driver' && employee.id !== record.employeeId).map((employee) => (
+                                          <option key={employee.id} value={employee.id}>{employee.name}</option>
+                                        ))}
+                                      </select>
+                                    </td>
+                                  )}
+                                  {!partnerAllowedStatuses.includes(inlineEditValues.attendanceStatus) && (
+                                    <td className="px-6 py-4">
+                                      <span className="text-slate-400">-</span>
+                                    </td>
+                                  )}
                                   <td className="px-6 py-4">
-                                    <span className="text-slate-400">-</span>
+                                    <textarea
+                                      rows={2}
+                                      value={inlineEditValues.keterangan}
+                                      onChange={(event) => setInlineEditValues((current) => ({ ...current, keterangan: event.target.value }))}
+                                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                    />
                                   </td>
-                                )}
-                                <td className="px-6 py-4">
-                                  <textarea
-                                    rows={2}
-                                    value={inlineEditValues.keterangan}
-                                    onChange={(event) => setInlineEditValues((current) => ({ ...current, keterangan: event.target.value }))}
-                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                                  />
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex flex-wrap gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleInlineSave(record)}
-                                      className="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
-                                    >
-                                      Simpan
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleCancelInlineEdit}
-                                      className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-                                    >
-                                      Batal
-                                    </button>
-                                  </div>
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="px-6 py-4">{record.tanggal}</td>
-                                <td className="px-6 py-4">{record.employeeName}</td>
-                                <td className="px-6 py-4">
-                                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyle[record.kehadiran]}`}>{record.kehadiran}</span>
-                                </td>
-                                <td className="px-6 py-4">{record.partnerName || '-'}</td>
-                                <td className="px-6 py-4">{record.keterangan || '-'}</td>
-                                <td className="px-6 py-4">
-                                  {currentUser?.role === 'admin' ? (
+                                  <td className="px-6 py-4">
                                     <div className="flex flex-wrap gap-2">
                                       <button
                                         type="button"
-                                        onClick={() => handleEditAttendance(record)}
-                                        className="rounded-full border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-50"
+                                        onClick={() => handleInlineSave(record)}
+                                        className="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
                                       >
-                                        Edit
+                                        Simpan
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => handleDeleteAttendance(record)}
-                                        className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                                        onClick={handleCancelInlineEdit}
+                                        className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                                       >
-                                        Delete
+                                        Batal
                                       </button>
                                     </div>
-                                  ) : null}
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        );
-                      })}
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="px-6 py-4">{record.tanggal}</td>
+                                  <td className="px-6 py-4">{record.employeeName}</td>
+                                  <td className="px-6 py-4">
+                                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyle[record.kehadiran]}`}>{record.kehadiran}</span>
+                                  </td>
+                                  <td className="px-6 py-4">{record.partnerName || '-'}</td>
+                                  <td className="px-6 py-4">{record.keterangan || '-'}</td>
+                                  <td className="px-6 py-4">
+                                    {currentUser?.role === 'admin' ? (
+                                      <div className="flex flex-wrap gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEditAttendance(record)}
+                                          className="rounded-full border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-50"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteAttendance(record)}
+                                          className="rounded-full border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          ))}
+                        </>
+                      ))}
                     </tbody>
                   ))
                 )}
               </table>
             </div>
           </div>
+
         </section>
       </div>
     </main>
