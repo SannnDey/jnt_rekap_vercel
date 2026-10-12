@@ -1,54 +1,92 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Banknote,
+  CalendarDays,
+  ClipboardList,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  Receipt,
+  ShieldCheck,
+  Sparkles,
+  Wallet,
+} from 'lucide-react';
 import { useToast } from '@/components/ToastProvider';
-import Header from '@/components/Header';
 import { authService } from '@/lib/auth';
 
 const modules = [
-   {
+  {
     title: 'Rekapan Internal Harian',
-    description: 'Kelola data internal harian dengan form dan tabel ringkas.',
+    description: 'Catat dan tinjau aktivitas operasional harian dengan cepat.',
     href: '/rekapan-internal-harian',
-    accent: 'from-amber-500 to-orange-500',
+    icon: ClipboardList,
+    accent: 'bg-amber-50 text-amber-700 ring-amber-100',
+    number: '01',
   },
   {
     title: 'Rekapan Outgoing',
-    description: 'Kelola data pengiriman keluar dan lihat ringkasan operasional.',
+    description: 'Kelola data pengiriman keluar dan cari rekapan yang dibutuhkan.',
     href: '/rekapan-outgoing',
-    accent: 'from-sky-500 to-cyan-500',
+    icon: Package,
+    accent: 'bg-sky-50 text-sky-700 ring-sky-100',
+    number: '02',
   },
   {
     title: 'Rekapan Pengeluaran Harian',
-    description: 'Catat pengeluaran harian dan lihat ringkasannya.',
+    description: 'Catat transaksi pengeluaran dan pantau pencatatannya.',
     href: '/rekapan-pengeluaran-harian-outgoing',
-    accent: 'from-emerald-500 to-lime-500',
+    icon: Receipt,
+    accent: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+    number: '03',
   },
   {
     title: 'Rekapan Schedule',
-    description: 'Lihat ringkasan jadwal operasional dan status tugas shift.',
+    description: 'Kelola kehadiran dan lihat ringkasan schedule bulanan.',
     href: '/rekapan-schedule',
-    accent: 'from-cyan-500 to-sky-500',
+    icon: CalendarDays,
+    accent: 'bg-cyan-50 text-cyan-700 ring-cyan-100',
+    number: '04',
   },
   {
     title: 'Rekapan Gaji',
-    description: 'Hitung gaji Admin dan Driver berdasarkan kehadiran, bonus, dan kasbon.',
+    description: 'Tinjau perhitungan gaji, kehadiran, bonus, dan kasbon.',
     href: '/rekapan-gaji',
-    accent: 'from-emerald-500 to-lime-500',
+    icon: Banknote,
+    accent: 'bg-violet-50 text-violet-700 ring-violet-100',
+    number: '05',
   },
   {
     title: 'Rekapan Kasbon',
-    description: 'Pantau kasbon per karyawan dan riwayat transaksi.',
+    description: 'Pantau transaksi kasbon dan riwayat per karyawan.',
     href: '/rekapan-kasbon',
-    accent: 'from-violet-500 to-fuchsia-500',
+    icon: Wallet,
+    accent: 'bg-rose-50 text-rose-700 ring-rose-100',
+    number: '06',
   },
 ];
 
+const roleLabel = (role?: string) => {
+  if (role === 'admin') return 'Administrator';
+  if (role === 'developer') return 'Developer';
+  return 'Driver';
+};
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 11) return 'Selamat pagi';
+  if (hour < 15) return 'Selamat siang';
+  if (hour < 18) return 'Selamat sore';
+  return 'Selamat malam';
+};
+
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
-
   const router = useRouter();
   const { toast } = useToast();
 
@@ -58,121 +96,168 @@ export default function HomePage() {
 
   const visibleModules = useMemo(() => {
     if (currentUser?.role === 'driver') {
-      return modules.filter((module) => ['\/rekapan-internal-harian', '\/rekapan-schedule'].includes(module.href));
+      return modules.filter((module) => ['/rekapan-internal-harian', '/rekapan-schedule'].includes(module.href));
     }
     return modules;
-  }, [currentUser]);
+  }, [currentUser?.role]);
+
+  const todayLabel = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date());
+  const userInitial = currentUser?.name?.trim()?.charAt(0)?.toLocaleUpperCase() || 'U';
+
+  const handleLogout = () => {
+    authService.logout();
+    setCurrentUser(null);
+    toast('Anda telah keluar.', 'success');
+    router.push('/login');
+  };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <Header
-        title="Dashboard Utama"
-        subtitle="Sistem Rekap J&T Cargo BDG015A"
-        description="Pusat kontrol untuk mengelola semua rekap J&T Cargo."
-        right={
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:block">
-              <div className="space-y-2 text-sm leading-6 text-slate-200">
-                <p className="font-semibold uppercase tracking-[0.3em] text-sky-300">Navigasi Cepat</p>
-                <p>Semua modul penting berada dalam satu halaman yang rapi.</p>
-              </div>
+    <main className="min-h-screen bg-slate-100 text-slate-900">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sky-300 shadow-lg shadow-slate-900/10">
+              <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
             </div>
+            <div>
+              <p className="text-sm font-bold tracking-wide text-slate-950">JNT REKAP</p>
+              <p className="mt-0.5 text-xs text-slate-500">Portal operasional · BDG015A</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 sm:justify-end">
             {currentUser && (
-              <div className="flex items-center gap-3">
-                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.24em] text-slate-300">{currentUser.role === 'admin' ? 'Admin' : currentUser.role === 'developer' ? 'Developer' : 'Driver'}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    authService.logout();
-                    setCurrentUser(null);
-                    toast('Anda telah keluar.', 'success');
-                    router.push('/login');
-                  }}
-                  className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
-                >
-                  Logout
-                </button>
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-800">
+                  {userInitial}
+                </div>
+                <div className="min-w-0">
+                  <p className="max-w-44 truncate text-sm font-semibold text-slate-900">{currentUser.name}</p>
+                  <p className="text-xs text-slate-500">{roleLabel(currentUser.role)}</p>
+                </div>
               </div>
             )}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              Keluar
+            </button>
           </div>
-        }
-      />
+        </div>
+      </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
-        <section className="rounded-[2.5rem] border border-white/10 bg-slate-900/90 p-8 shadow-[0_30px_90px_rgba(15,23,42,0.35)] backdrop-blur-xl">
-          <div className="grid gap-10 lg:grid-cols-[1.4fr_0.9fr] lg:items-start">
-            <div className="space-y-6">
-              <div className="inline-flex rounded-full bg-sky-500/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.28em] text-sky-200 shadow-sm shadow-sky-500/10">
-                Selamat Datang
+      <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 lg:px-6 lg:py-10">
+        <section className="relative isolate overflow-hidden rounded-[2rem] bg-slate-950 px-6 py-8 text-white shadow-xl shadow-slate-900/10 sm:px-9 sm:py-10 lg:px-12">
+          <div className="pointer-events-none absolute -right-16 -top-32 -z-10 h-96 w-96 rounded-full bg-sky-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-40 right-1/3 -z-10 h-72 w-72 rounded-full bg-indigo-500/15 blur-3xl" />
+          <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-sky-200">
+                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                Dashboard operasional
               </div>
-              <div className="space-y-4">
-                <h2 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Kelola semua rekap dengan akurat dan tepat.
-                </h2>
-                <p className="max-w-2xl text-base leading-8 text-slate-300">
-                  Akses cepat ke pengeluaran, kasbon, outgoing, dan internal harian.
-                </p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
-                  <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Modul Tersedia</p>
-                  <p className="mt-3 text-3xl font-semibold text-white">{modules.length}</p>
-                  <p className="mt-2 text-sm text-slate-400">Satu klik untuk masuk ke setiap area kerja penting.</p>
-                </div>
-                <div className="rounded-[2rem] border border-white/10 bg-slate-950/80 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
-                  <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Keunggulan</p>
-                  <p className="mt-3 text-3xl font-semibold text-white">Antarmuka Premium</p>
-                  <p className="mt-2 text-sm text-slate-400">Desain modern, kontras tajam, dan navigasi yang lebih nyaman.</p>
-                </div>
+              <p className="mt-6 text-sm font-medium text-slate-300">{getGreeting()},</p>
+              <h1 className="mt-1 break-words text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
+                {currentUser?.name || 'Pengguna'}
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+                Semua area kerja dan pencatatan operasional tersedia di sini. Pilih modul untuk melanjutkan pekerjaan Anda.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-slate-200 backdrop-blur-sm">
+              <CalendarDays className="h-5 w-5 text-sky-300" aria-hidden="true" />
+              <div>
+                <p className="text-xs text-slate-400">Hari ini</p>
+                <p className="mt-0.5 font-semibold capitalize">{todayLabel}</p>
               </div>
             </div>
+          </div>
+        </section>
 
-            <div className="rounded-[2rem] border border-white/10 bg-slate-950/80 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-300">Sorotan Modul</p>
-                {currentUser && (
-                  <span className="rounded-full bg-slate-800 px-3 py-1 text-xs uppercase tracking-[0.24em] text-slate-300">
-                    {currentUser.role === 'admin' ? 'Admin' : 'Driver'}
-                  </span>
-                )}
-              </div>
-              <div className="mt-6 space-y-4">
-                {visibleModules.map((module) => (
-                  <Link
-                    key={module.href}
-                    href={module.href}
-                    className="group flex items-start gap-4 rounded-[1.75rem] border border-white/5 bg-white/5 px-5 py-5 transition hover:border-sky-300/40 hover:bg-slate-900/90"
-                  >
-                    <div className={`mt-1 h-12 w-12 rounded-3xl bg-gradient-to-br ${module.accent} p-3 shadow-lg shadow-slate-950/20`} />
-                    <div className="grow">
-                      <h3 className="text-lg font-semibold text-white">{module.title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-400">{module.description}</p>
+        <section aria-label="Ringkasan akses" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
+              <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Modul yang dapat diakses</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-950">{visibleModules.length}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-700">
+              <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Jenis akun</p>
+              <p className="mt-1 text-lg font-semibold text-slate-950">{roleLabel(currentUser?.role)}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:col-span-2 lg:col-span-1">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+              <ClipboardList className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Ruang kerja</p>
+              <p className="mt-1 text-lg font-semibold text-slate-950">Rekap harian & operasional</p>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="modules-heading">
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Navigasi</p>
+              <h2 id="modules-heading" className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Pilih area kerja</h2>
+              <p className="mt-1 text-sm text-slate-500">Buka modul yang sesuai untuk melihat atau mengelola rekapan.</p>
+            </div>
+            <span className="text-sm text-slate-500">{visibleModules.length} modul tersedia</span>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {visibleModules.map((module) => {
+              const Icon = module.icon;
+              return (
+                <Link
+                  key={module.href}
+                  href={module.href}
+                  className="group flex min-h-52 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-sky-200 hover:shadow-lg hover:shadow-slate-900/5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 ${module.accent}`}>
+                      <Icon className="h-5 w-5" aria-hidden="true" />
                     </div>
-                    <span className="self-center text-sky-300 transition group-hover:translate-x-1">→</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
+                    <span className="text-xs font-semibold tracking-wider text-slate-300">{module.number}</span>
+                  </div>
+                  <div className="mt-5 flex grow flex-col">
+                    <h3 className="text-base font-semibold text-slate-900">{module.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">{module.description}</p>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 text-sm font-semibold text-sky-700">
+                    <span>Buka modul</span>
+                    <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </section>
 
-        <section className="mt-10 grid gap-6 lg:grid-cols-3">
-          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.2)] backdrop-blur-xl">
-            <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Performa</p>
-            <p className="mt-4 text-3xl font-semibold text-white">Lebih cepat</p>
-            <p className="mt-3 text-sm leading-6 text-slate-400">Antarmuka responsif dengan hierarki visual yang jelas.</p>
+        <footer className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <p>Gunakan navigasi modul di atas untuk mengakses pencatatan sesuai kebutuhan operasional.</p>
+          <div className="inline-flex items-center gap-2 font-medium text-slate-600">
+            Akun aktif: {currentUser?.name || 'Pengguna'}
+            <ArrowRight className="h-4 w-4 text-sky-600" aria-hidden="true" />
           </div>
-          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.2)] backdrop-blur-xl">
-            <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Keamanan</p>
-            <p className="mt-4 text-3xl font-semibold text-white">Tingkat tinggi</p>
-            <p className="mt-3 text-sm leading-6 text-slate-400">Desain menekankan kontras dan kejelasan data dalam lingkungan kerja yang aman.</p>
-          </div>
-          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_20px_50px_rgba(15,23,42,0.2)] backdrop-blur-xl">
-            <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Produktivitas</p>
-            <p className="mt-4 text-3xl font-semibold text-white">Lebih fokus</p>
-            <p className="mt-3 text-sm leading-6 text-slate-400">Navigasi modul yang mudah membuat pekerjaan menjadi lebih terorganisir.</p>
-          </div>
-        </section>
+        </footer>
       </div>
     </main>
   );
